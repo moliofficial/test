@@ -366,16 +366,28 @@ window.showMsgMenu = (e, msgId) => {
 
 window.deleteMsg = async (msgId, chatType) => {
   document.getElementById('msg-ctx-menu')?.remove();
-  if (!msgId || !chatType) return showToast('Error: data tidak lengkap', 'error');
+  if (!msgId) return showToast('ID pesan tidak valid', 'error');
+
+  // Ambil chatType dari currentChat kalau tidak ada
+  const type = chatType || currentChat?.type || 'dm';
+  const colName = type === 'dm' ? 'messages' : 'group_messages';
+
   if (!confirm('Hapus pesan ini?')) return;
+
   try {
-    const colName = chatType === 'dm' ? 'messages' : 'group_messages';
-    const msgRef = doc(db, colName, msgId);
-    await deleteDoc(msgRef);
+    // Coba hapus langsung
+    await deleteDoc(doc(db, colName, msgId));
     showToast('Pesan dihapus', 'success');
   } catch(e) {
-    showToast('Gagal hapus: ' + e.message, 'error');
-    console.error('Delete error:', e);
+    // Kalau gagal, coba koleksi lain (fallback)
+    try {
+      const altCol = colName === 'messages' ? 'group_messages' : 'messages';
+      await deleteDoc(doc(db, altCol, msgId));
+      showToast('Pesan dihapus', 'success');
+    } catch(e2) {
+      showToast('Gagal hapus: ' + e2.message, 'error');
+      console.error('Delete error:', msgId, colName, e2);
+    }
   }
 };
 
@@ -1233,6 +1245,7 @@ function showStatusSlide(idx) {
   currentStatusIndex = idx;
 
   const viewer = document.getElementById('status-viewer');
+  if (!viewer) return;
   viewer.style.display = 'flex';
   hideBottomNav();
 
@@ -1253,11 +1266,12 @@ function showStatusSlide(idx) {
   if (isOwner) document.getElementById('sv-delete').onclick = () => deleteMyStatus(statusId);
 
   // Progress bars untuk multi-slide
-  const prog = document.getElementById('sv-progress');
-  prog.style.transition = 'none'; prog.style.width = '0%';
-
-  // Update progress segments
+  // Update progress segments dulu
   updateProgressSegments(idx, currentStatusQueue.length);
+
+  // Baru ambil prog element (karena baru di-render di updateProgressSegments)
+  const prog = document.getElementById('sv-progress');
+  if (prog) { prog.style.transition = 'none'; prog.style.width = '0%'; }
 
   const svContent = document.getElementById('sv-content');
   if (!statusData.mediaUrl) {
@@ -1292,8 +1306,8 @@ function showStatusSlide(idx) {
   // Auto next
   if (statusTimer) clearTimeout(statusTimer);
   setTimeout(() => {
-    prog.style.transition = `width ${duration/1000}s linear`;
-    prog.style.width = '100%';
+    const p = document.getElementById('sv-progress');
+    if (p) { p.style.transition = `width ${duration/1000}s linear`; p.style.width = '100%'; }
   }, 50);
   statusTimer = setTimeout(() => showStatusSlide(idx + 1), duration);
 }
@@ -1301,8 +1315,15 @@ function showStatusSlide(idx) {
 function updateProgressSegments(currentIdx, total) {
   const container = document.getElementById('sv-progress-container');
   if (!container) return;
+  if (total <= 1) {
+    // Satu status - pakai progress bar biasa
+    container.innerHTML = `<div style="flex:1;height:3px;background:rgba(255,255,255,0.3);border-radius:2px;overflow:hidden">
+      <div id="sv-progress" style="height:100%;background:var(--accent);width:0%"></div>
+    </div>`;
+    return;
+  }
   container.innerHTML = Array.from({length: total}, (_, i) => `
-    <div style="flex:1;height:3px;background:${i < currentIdx ? 'var(--accent)' : i === currentIdx ? 'transparent' : 'rgba(255,255,255,0.3)'};border-radius:2px;overflow:hidden;margin:0 1px">
+    <div style="flex:1;height:3px;background:${i < currentIdx ? 'var(--accent)' : 'rgba(255,255,255,0.3)'};border-radius:2px;overflow:hidden;margin:0 1px">
       ${i === currentIdx ? '<div id="sv-progress" style="height:100%;background:var(--accent);width:0%"></div>' : ''}
     </div>
   `).join('');
