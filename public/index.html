@@ -789,11 +789,16 @@
   <!-- SIDEBAR -->
   <div id="sidebar">
     <div class="sidebar-header">
-      <div class="logo">Kmoli<span>Chat</span></div>
+      <div class="user-avatar-small" id="my-avatar">?</div>
+      <div style="flex:1;min-width:0">
+        <div class="user-name-display" id="my-name">—</div>
+        <div class="user-email-display" id="my-email">—</div>
+      </div>
       <div class="header-actions">
         <div class="icon-btn" onclick="openNewDM()" title="Chat Baru">✏️</div>
         <div class="icon-btn" onclick="openCreateGroup()" title="Buat Grup">👥</div>
         <div class="icon-btn" onclick="openJoinGroup()" title="Join Grup">🔗</div>
+        <div class="icon-btn" onclick="doLogout()" title="Keluar" style="color:var(--danger)">⏻</div>
       </div>
     </div>
     <div class="search-wrap">
@@ -807,14 +812,7 @@
     <div id="chat-list">
       <div class="loading-dots">Memuat chat...</div>
     </div>
-    <div class="sidebar-footer">
-      <div class="user-avatar-small" id="my-avatar">?</div>
-      <div>
-        <div class="user-name-display" id="my-name">—</div>
-        <div class="user-email-display" id="my-email">—</div>
-      </div>
-      <button class="btn-logout" onclick="doLogout()">Keluar</button>
-    </div>
+
   </div>
 
   <!-- CHAT AREA -->
@@ -843,7 +841,7 @@
     </div>
   </div>
 
-  <!-- GROUP INFO PANEL -->
+  <!-- GROUP INFO PANEL (desktop) -->
   <div id="group-info-panel">
     <div class="group-info-header">
       <h3>Info Grup</h3>
@@ -851,6 +849,19 @@
     </div>
     <div class="group-info-body" id="group-info-body"></div>
   </div>
+</div>
+
+<!-- GROUP SETTINGS SCREEN (full screen route) -->
+<div id="group-settings-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:50;flex-direction:column;overflow-y:auto">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1">
+    <div class="icon-btn" onclick="closeGroupSettings()">←</div>
+    <h2 style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace;flex:1">Pengaturan Grup</h2>
+    <div class="icon-btn" id="gs-edit-btn" style="display:none" onclick="toggleEditGroup()">✏️</div>
+  </div>
+  <div id="group-settings-body" style="padding:20px;max-width:600px;margin:0 auto;width:100%"></div>
+</div>
+
+<div id="app-screen-wrapper" style="display:none">
 </div>
 
 <!-- MODALS -->
@@ -939,6 +950,35 @@
 <!-- Firebase SDK -->
 <script type="module" src="js/firebase-config.js"></script>
 <script type="module" src="js/app.js"></script>
+
+<!-- GROUP SETTINGS SCREEN -->
+<div id="group-settings-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;overflow-y:auto;">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1;">
+    <div class="icon-btn" onclick="closeGroupSettings()">←</div>
+    <h2 style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace;flex:1" id="gs-title">Pengaturan Grup</h2>
+    <div class="icon-btn" id="gs-edit-btn" style="display:none" onclick="openGSEdit()">✏️</div>
+  </div>
+  <div id="group-settings-body" style="padding:20px;max-width:580px;margin:0 auto;width:100%;"></div>
+</div>
+
+<!-- GROUP SETTINGS EDIT MODAL -->
+<div class="modal-overlay" id="modal-gs-edit">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Grup</div>
+      <div class="modal-close" onclick="closeModal('modal-gs-edit')">✕</div>
+    </div>
+    <div class="form-group">
+      <label>Nama Grup</label>
+      <input type="text" id="gs-edit-name" placeholder="Nama grup" />
+    </div>
+    <div class="form-group">
+      <label>Bio / Deskripsi</label>
+      <textarea class="form-control" id="gs-edit-bio" placeholder="Deskripsi grup..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveGSEdit()" style="margin-top:4px">Simpan</button>
+  </div>
+</div>
 </body>
 </html>
 <style>
