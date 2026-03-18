@@ -1111,3 +1111,33 @@ window.deleteMyStatus = async (statusId) => {
     await loadStatuses();
   } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
 };
+
+// ===================== BOTTOM NAVBAR =====================
+window.switchBottomTab = (tab) => {
+  // Highlight active tab
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`nav-${tab}`)?.classList.add('active');
+};
+
+// Set active tab saat buka chat
+const _origOpenChat = window.openChat;
+window.openChat = async (type, id) => {
+  await _origOpenChat(type, id);
+  switchBottomTab('chats');
+};
+
+// Set active saat buka status/settings
+const _origOpenStatus = window.openStatus;
+window.openStatus = async () => {
+  await _origOpenStatus();
+  switchBottomTab('status');
+};
+
+const _origOpenSettings = window.openSettings;
+window.openSettings = async () => {
+  await _origOpenSettings();
+  switchBottomTab('settings');
+};
+
+// Init active tab
+switchBottomTab('chats');
