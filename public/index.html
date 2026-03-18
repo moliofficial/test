@@ -825,6 +825,7 @@
     </div>
     <div id="chat-view">
       <div class="chat-header">
+        <div class="icon-btn" id="back-btn" onclick="showSidebarMobile()" style="display:none">←</div>
         <div class="chat-avatar" id="ch-avatar">?</div>
         <div class="chat-header-info">
           <div class="chat-header-name" id="ch-name">—</div>
@@ -940,3 +941,68 @@
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
+<style>
+/* MOBILE RESPONSIVE FIX */
+@media (max-width: 768px) {
+  body { overflow: hidden; }
+  #app-screen {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+  #sidebar {
+    width: 100vw !important;
+    min-width: 0 !important;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 10;
+    height: 100vh;
+    transition: transform 0.25s ease;
+  }
+  #sidebar.hidden {
+    transform: translateX(-100%);
+    pointer-events: none;
+  }
+  #chat-area {
+    width: 100vw !important;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 9;
+    height: 100vh;
+    display: none;
+    flex-direction: column;
+  }
+  #chat-area.mobile-active { display: flex !important; }
+  #chat-view {
+    height: 100vh;
+    display: none;
+    flex-direction: column;
+  }
+  #chat-view.active { display: flex !important; }
+  #messages-container {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chat-input-area {
+    position: sticky;
+    bottom: 0;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  #group-info-panel { display: none !important; }
+  #back-btn { display: flex !important; }
+}
+</style>
+<script>
+// Tampilkan back button hanya di mobile
+function updateBackBtn() {
+  const btn = document.getElementById('back-btn');
+  if (btn) btn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+}
+window.addEventListener('resize', updateBackBtn);
+updateBackBtn();
+</script>
