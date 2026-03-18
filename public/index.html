@@ -776,56 +776,12 @@
     <div class="icon">💬</div>
     <h1>Kmoli<span>Chat</span></h1>
   </div>
-
-  <!-- STEP 1: Input nomor HP -->
-  <div id="step-phone">
-    <p class="auth-step-label">Masuk atau daftar pakai <strong>WhatsApp</strong>.<br>OTP akan dikirim ke nomormu.</p>
-    <div class="form-group">
-      <label>Nomor WhatsApp</label>
-      <div class="phone-input-wrap">
-        <div class="phone-prefix">🇮🇩 +62</div>
-        <input type="tel" id="phone-input" placeholder="8123456789" maxlength="13"
-          style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;outline:none;"
-          onkeydown="if(event.key==='Enter')sendOTP()" />
-      </div>
-    </div>
-    <button class="btn btn-primary" onclick="sendOTP()" id="send-otp-btn">Kirim OTP via WhatsApp</button>
-    <div id="auth-error"></div>
-  </div>
-
-  <!-- STEP 2: Input OTP -->
-  <div id="step-otp" style="display:none">
-    <button class="back-btn" onclick="backToPhone()">← Ganti nomor</button>
-    <p class="auth-step-label">Kode OTP dikirim ke<br><strong id="otp-phone-display">+62xxx</strong></p>
-    <div class="otp-inputs">
-      <input class="otp-digit" type="tel" maxlength="1" id="otp0" oninput="otpNext(this,1)" onkeydown="otpBack(event,this,null)" />
-      <input class="otp-digit" type="tel" maxlength="1" id="otp1" oninput="otpNext(this,2)" onkeydown="otpBack(event,this,0)" />
-      <input class="otp-digit" type="tel" maxlength="1" id="otp2" oninput="otpNext(this,3)" onkeydown="otpBack(event,this,1)" />
-      <input class="otp-digit" type="tel" maxlength="1" id="otp3" oninput="otpNext(this,4)" onkeydown="otpBack(event,this,2)" />
-      <input class="otp-digit" type="tel" maxlength="1" id="otp4" oninput="otpNext(this,5)" onkeydown="otpBack(event,this,3)" />
-      <input class="otp-digit" type="tel" maxlength="1" id="otp5" oninput="otpNext(this,null)" onkeydown="otpBack(event,this,4)" />
-    </div>
-    <button class="btn btn-primary" onclick="verifyOTP()" id="verify-otp-btn">Verifikasi</button>
-    <div class="resend-wrap" style="margin-top:12px">
-      <span id="resend-timer">Kirim ulang dalam <span id="resend-count">60</span>s</span>
-      <button class="resend-btn" id="resend-btn" style="display:none" onclick="sendOTP()">Kirim Ulang OTP</button>
-    </div>
-    <div id="auth-error-otp" style="margin-top:10px;padding:10px 14px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:8px;color:var(--danger);font-size:13px;display:none"></div>
-  </div>
-
-  <!-- STEP 3: Isi nama (user baru saja) -->
-  <div id="step-name" style="display:none">
-    <button class="back-btn" onclick="backToPhone()">← Mulai ulang</button>
-    <p class="auth-step-label">Halo! Sepertinya kamu <strong>baru pertama kali</strong>.<br>Isi nama tampilmu dulu.</p>
-    <div class="form-group">
-      <label>Nama Tampil</label>
-      <input type="text" id="display-name-input" placeholder="Nama kamu" maxlength="30"
-        onkeydown="if(event.key==='Enter')saveName()" />
-    </div>
-    <p class="name-hint">Nama ini akan terlihat oleh pengguna lain</p>
-    <button class="btn btn-primary" onclick="saveName()" id="save-name-btn">Masuk ke KmoliChat</button>
-    <div id="auth-error-name" style="margin-top:10px;padding:10px 14px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:8px;color:var(--danger);font-size:13px;display:none"></div>
-  </div>
+  <p class="auth-step-label">Masuk pakai akun <strong>Google</strong> kamu.</p>
+  <button class="btn btn-primary" id="login-google-btn" onclick="doLoginGoogle()" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px">
+    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.1 18.9 12 24 12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.4 35.5 26.8 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.6 39.6 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.8 35.5 44 30.1 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
+    Masuk dengan Google
+  </button>
+  <div id="auth-error" style="margin-top:12px;padding:10px 14px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:8px;color:var(--danger);font-size:13px;display:none"></div>
 </div>
 
 <!-- APP SCREEN -->
