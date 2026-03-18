@@ -1228,11 +1228,8 @@
 /* Tambah padding bawah untuk sidebar saat mobile */
 @media (max-width: 768px) {
   #bottom-nav { display: flex; }
-  #chat-area.mobile-active + * #bottom-nav,
-  #chat-area.mobile-active ~ #bottom-nav { display: none !important; }
-  #sidebar { padding-bottom: 60px; }
-  #chat-area.mobile-active ~ #bottom-nav,
-  body.in-chat #bottom-nav { display: none !important; }
+  #sidebar { padding-bottom: 70px; }
+}
 }
 
 /* Desktop: sembunyikan bottom nav */
@@ -1248,51 +1245,78 @@
 
 
 
-<style>
-/* CHAT LAYOUT FIX */
-#chat-view {
-  display: none;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
-}
-#chat-view.active { display: flex; }
 
-#messages-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 16px;
-  padding-bottom: 8px;
-}
-
-.chat-input-area {
-  display: flex !important;
-  flex-shrink: 0 !important;
-  align-items: flex-end;
-  gap: 10px;
-  padding: 10px 12px !important;
-  padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
-  background: var(--surface) !important;
-  border-top: 1px solid var(--border) !important;
-  position: relative !important;
-  bottom: auto !important;
-}
-
+<style id="mobile-fix-final">
+/* ===== MOBILE CHAT LAYOUT - FINAL FIX ===== */
 @media (max-width: 768px) {
+  /* App screen jadi fixed full screen */
+  #app-screen {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  /* Sidebar full screen, bisa disembunyikan */
+  #sidebar {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    z-index: 10 !important;
+    transition: transform 0.2s ease !important;
+    padding-bottom: 70px !important;
+  }
+  #sidebar.hidden {
+    transform: translateX(-100%) !important;
+    pointer-events: none !important;
+  }
+
+  /* Chat area full screen di belakang sidebar */
   #chat-area {
-    position: fixed;
-    inset: 0;
-    display: none;
-    flex-direction: column;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    z-index: 9 !important;
+    display: none !important;
+    flex-direction: column !important;
+    height: 100% !important;
   }
-  #chat-area.mobile-active { display: flex !important; }
+  #chat-area.mobile-active {
+    display: flex !important;
+  }
+
+  /* Chat view mengisi penuh chat-area */
   #chat-view {
-    height: 100%;
-    flex: 1;
+    display: none !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    overflow: hidden !important;
   }
+  #chat-view.active {
+    display: flex !important;
+  }
+
+  /* Messages bisa scroll, tidak overflow */
+  #messages-container {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Input SELALU muncul di bawah */
+  .chat-input-area {
+    flex-shrink: 0 !important;
+    display: flex !important;
+    padding-bottom: max(14px, env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Sembunyikan panel yg tidak perlu */
+  #group-info-panel { display: none !important; }
+  #back-btn { display: flex !important; }
 }
 </style>
 </body>
