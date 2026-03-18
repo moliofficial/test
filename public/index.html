@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KmoliChat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #1a1a24;
+      --border: #2a2a3a;
+      --accent: #00e5a0;
+      --accent2: #7c3aed;
+      --text: #f0f0f5;
+      --text2: #8888a8;
+      --danger: #ff4466;
+      --msg-out: #1e3a2f;
+      --msg-in: #1a1a24;
+      --radius: 12px;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    body::before {
+      content:'';
+      position:fixed;
+      inset:0;
+      background: radial-gradient(ellipse 80% 80% at 20% 20%, rgba(0,229,160,0.05) 0%, transparent 60%),
+                  radial-gradient(ellipse 60% 60% at 80% 80%, rgba(124,58,237,0.06) 0%, transparent 60%);
+      pointer-events:none;
+    }
+
+    /* AUTH */
+    #auth-screen {
+      width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 36px;
+      position: relative;
+    }
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .auth-logo .icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+    .auth-logo h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: 22px;
+      letter-spacing: -0.5px;
+    }
+    .auth-logo h1 span { color: var(--accent); }
+    .auth-step-label {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .auth-step-label strong { color: var(--accent); }
+    .phone-input-wrap {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .phone-prefix {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text2);
+      font-size: 15px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .otp-inputs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .otp-digit {
+      width: 46px; height: 54px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      text-align: center;
+      outline: none;
+      transition: border .2s;
+    }
+    .otp-digit:focus { border-color: var(--accent); }
+    .resend-wrap {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 16px;
+    }
+    .resend-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      text-decoration: underline;
+    }
+    .resend-btn:disabled { color: var(--text2); cursor: default; text-decoration: none; }
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 20px;
+      padding: 0;
+      transition: color .2s;
+    }
+    .back-btn:hover { color: var(--text); }
+    .name-hint {
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: -10px;
+      margin-bottom: 16px;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'DM Sans', sans-serif;
+      transition: border .2s;
+      outline: none;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    #auth-error {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(255,68,102,0.1);
+      border: 1px solid rgba(255,68,102,0.3);
+      border-radius: 8px;
+      color: var(--danger);
+      font-size: 13px;
+      display: none;
+    }
+
+    /* APP */
+    #app-screen {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      flex-direction: row;
+    }
+    #app-screen.active { display: flex; }
+
+    /* SIDEBAR */
+    #sidebar {
+      width: 340px;
+      min-width: 340px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sidebar-header .logo {
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .sidebar-header .logo span { color: var(--accent); }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      width: 36px; height: 36px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all .2s;
+      color: var(--text2);
+      font-size: 16px;
+    }
+    .icon-btn:hover { background: var(--border); color: var(--text); }
+    .search-wrap {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-wrap input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .chat-tabs {
+      display: flex;
+      padding: 10px 16px;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chat-tab {
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text2);
+      border: 1px solid transparent;
+      transition: all .2s;
+    }
+    .chat-tab.active {
+      background: rgba(0,229,160,0.1);
+      color: var(--accent);
+      border-color: rgba(0,229,160,0.3);
+    }
+    #chat-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    #chat-list::-webkit-scrollbar { width: 4px; }
+    #chat-list::-webkit-scrollbar-track { background: transparent; }
+    #chat-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .chat-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .chat-item:hover, .chat-item.active { background: var(--surface2); }
+    .chat-avatar {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      font-family: 'Space Mono', monospace;
+      overflow: hidden;
+    }
+    .chat-avatar img { width:100%; height:100%; object-fit:cover; }
+    .chat-info { flex: 1; min-width: 0; }
+    .chat-name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-last {
+      font-size: 12px;
+      color: var(--text2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    .chat-meta { text-align: right; flex-shrink: 0; }
+    .chat-time { font-size: 11px; color: var(--text2); }
+    .unread-badge {
+      background: var(--accent);
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 1px 7px;
+      margin-top: 4px;
+      display: inline-block;
+    }
+    .sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-avatar-small {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .user-name-display { flex: 1; font-size: 13px; font-weight: 500; }
+    .user-email-display { font-size: 11px; color: var(--text2); }
+    .btn-logout {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      transition: all .2s;
+    }
+    .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* CHAT AREA */
+    #chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: relative;
+    }
+    #empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text2);
+    }
+    #empty-state .big-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.3; }
+    #empty-state p { font-size: 15px; }
+    #chat-view { display: none; flex-direction: column; height: 100vh; }
+    #chat-view.active { display: flex; }
+    .chat-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+    }
+    .chat-header-info { flex: 1; }
+    .chat-header-name { font-size: 16px; font-weight: 600; }
+    .chat-header-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+    .chat-header-actions { display: flex; gap: 8px; }
+    #messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #messages-container::-webkit-scrollbar { width: 4px; }
+    #messages-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .msg-group { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+    .msg-row { display: flex; }
+    .msg-row.out { justify-content: flex-end; }
+    .msg-row.in { justify-content: flex-start; }
+    .msg-bubble {
+      max-width: 68%;
+      padding: 9px 13px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      position: relative;
+    }
+    .msg-row.out .msg-bubble {
+      background: var(--msg-out);
+      border-bottom-right-radius: 4px;
+      color: var(--text);
+    }
+    .msg-row.in .msg-bubble {
+      background: var(--msg-in);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .msg-sender {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 3px;
+    }
+    .msg-time {
+      font-size: 10px;
+      color: var(--text2);
+      text-align: right;
+      margin-top: 3px;
+    }
+    .msg-date-divider {
+      text-align: center;
+      margin: 12px 0;
+    }
+    .msg-date-divider span {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+    .chat-input-area {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--surface);
+    }
+    #message-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      resize: none;
+      max-height: 120px;
+      transition: border .2s;
+      line-height: 1.5;
+    }
+    #message-input:focus { border-color: var(--accent); }
+    #send-btn {
+      width: 42px; height: 42px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      color: #000;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+      flex-shrink: 0;
+    }
+    #send-btn:hover { opacity: 0.85; transform: scale(1.05); }
+
+    /* MODALS */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      width: 420px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+    }
+    .modal-close {
+      width: 32px; height: 32px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 16px;
+      transition: all .2s;
+    }
+    .modal-close:hover { color: var(--danger); border-color: var(--danger); }
+    .btn-secondary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 11px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      width: 100%;
+      margin-top: 8px;
+      transition: all .2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger {
+      background: rgba(255,68,102,0.1);
+      border: 1px solid rgba(255,68,102,0.3);
+      color: var(--danger);
+      padding: 9px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all .2s;
+    }
+    .btn-danger:hover { background: rgba(255,68,102,0.2); }
+    .user-search-result {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background .15s;
+      border: 1px solid transparent;
+    }
+    .user-search-result:hover { background: var(--surface2); border-color: var(--border); }
+    .user-search-result .name { font-size: 14px; font-weight: 500; }
+    .user-search-result .email { font-size: 12px; color: var(--text2); }
+    .member-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .member-row:last-child { border-bottom: none; }
+    .member-row .name { flex: 1; font-size: 14px; }
+    .badge-admin {
+      background: rgba(0,229,160,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(0,229,160,0.3);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .invite-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .invite-box code {
+      flex: 1;
+      font-size: 12px;
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+      word-break: break-all;
+    }
+    .copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      white-space: nowrap;
+      transition: all .2s;
+    }
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    textarea.form-control {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      resize: vertical;
+      outline: none;
+      transition: border .2s;
+      min-height: 80px;
+    }
+    textarea.form-control:focus { border-color: var(--accent); }
+    .loading-dots { color: var(--text2); font-size: 13px; text-align:center; padding: 20px; }
+
+    /* JOIN GROUP */
+    .join-input-wrap { display:flex; gap:8px; }
+    .join-input-wrap input {
+      flex:1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius:10px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-size:14px;
+      outline:none;
+      font-family:'DM Sans',sans-serif;
+    }
+    .join-input-wrap button {
+      background: var(--accent);
+      border:none;
+      border-radius:10px;
+      color:#000;
+      padding: 0 18px;
+      font-size:14px;
+      font-weight:600;
+      cursor:pointer;
+      font-family:'DM Sans',sans-serif;
+    }
+
+    /* GROUP info panel */
+    #group-info-panel {
+      display: none;
+      width: 300px;
+      min-width: 300px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      flex-direction: column;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    #group-info-panel.active { display: flex; }
+    .group-info-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .group-info-header h3 {
+      flex:1;
+      font-size:15px;
+      font-weight:600;
+      font-family:'Space Mono',monospace;
+    }
+    .group-info-body { padding: 16px; }
+    .group-info-avatar {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 auto 12px;
+      overflow: hidden;
+    }
+    .group-info-avatar img { width:100%; height:100%; object-fit:cover; }
+    .group-info-name {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 6px;
+    }
+    .group-info-bio {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      z-index: 999;
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all .3s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(0,229,160,0.4); color: var(--accent); }
+    .toast.error { border-color: rgba(255,68,102,0.4); color: var(--danger); }
+
+    @media (max-width: 768px) {
+      #sidebar { width: 100%; min-width: 0; }
+      #sidebar.hidden { display: none; }
+      #chat-area { width: 100%; }
+      #group-info-panel { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-logo">
+    <div class="icon">💬</div>
+    <h1>Kmoli<span>Chat</span></h1>
+  </div>
+
+  <!-- STEP 1: Input nomor HP -->
+  <div id="step-phone">
+    <p class="auth-step-label">Masuk atau daftar pakai <strong>WhatsApp</strong>.<br>OTP akan dikirim ke nomormu.</p>
+    <div class="form-group">
+      <label>Nomor WhatsApp</label>
+      <div class="phone-input-wrap">
+        <div class="phone-prefix">🇮🇩 +62</div>
+        <input type="tel" id="phone-input" placeholder="8123456789" maxlength="13"
+          style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;outline:none;"
+          onkeydown="if(event.key==='Enter')sendOTP()" />
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="sendOTP()" id="send-otp-btn">Kirim OTP via WhatsApp</button>
+    <div id="auth-error"></div>
+  </div>
+
+  <!-- STEP 2: Input OTP -->
+  <div id="step-otp" style="display:none">
+    <button class="back-btn" onclick="backToPhone()">← Ganti nomor</button>
+    <p class="auth-step-label">Kode OTP dikirim ke<br><strong id="otp-phone-display">+62xxx</strong></p>
+    <div class="otp-inputs">
+      <input class="otp-digit" type="tel" maxlength="1" id="otp0" oninput="otpNext(this,1)" onkeydown="otpBack(event,this,null)" />
+      <input class="otp-digit" type="tel" maxlength="1" id="otp1" oninput="otpNext(this,2)" onkeydown="otpBack(event,this,0)" />
+      <input class="otp-digit" type="tel" maxlength="1" id="otp2" oninput="otpNext(this,3)" onkeydown="otpBack(event,this,1)" />
+      <input class="otp-digit" type="tel" maxlength="1" id="otp3" oninput="otpNext(this,4)" onkeydown="otpBack(event,this,2)" />
+      <input class="otp-digit" type="tel" maxlength="1" id="otp4" oninput="otpNext(this,5)" onkeydown="otpBack(event,this,3)" />
+      <input class="otp-digit" type="tel" maxlength="1" id="otp5" oninput="otpNext(this,null)" onkeydown="otpBack(event,this,4)" />
+    </div>
+    <button class="btn btn-primary" onclick="verifyOTP()" id="verify-otp-btn">Verifikasi</button>
+    <div class="resend-wrap" style="margin-top:12px">
+      <span id="resend-timer">Kirim ulang dalam <span id="resend-count">60</span>s</span>
+      <button class="resend-btn" id="resend-btn" style="display:none" onclick="sendOTP()">Kirim Ulang OTP</button>
+    </div>
+    <div id="auth-error-otp" style="margin-top:10px;padding:10px 14px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:8px;color:var(--danger);font-size:13px;display:none"></div>
+  </div>
+
+  <!-- STEP 3: Isi nama (user baru saja) -->
+  <div id="step-name" style="display:none">
+    <button class="back-btn" onclick="backToPhone()">← Mulai ulang</button>
+    <p class="auth-step-label">Halo! Sepertinya kamu <strong>baru pertama kali</strong>.<br>Isi nama tampilmu dulu.</p>
+    <div class="form-group">
+      <label>Nama Tampil</label>
+      <input type="text" id="display-name-input" placeholder="Nama kamu" maxlength="30"
+        onkeydown="if(event.key==='Enter')saveName()" />
+    </div>
+    <p class="name-hint">Nama ini akan terlihat oleh pengguna lain</p>
+    <button class="btn btn-primary" onclick="saveName()" id="save-name-btn">Masuk ke KmoliChat</button>
+    <div id="auth-error-name" style="margin-top:10px;padding:10px 14px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:8px;color:var(--danger);font-size:13px;display:none"></div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div id="app-screen">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">Kmoli<span>Chat</span></div>
+      <div class="header-actions">
+        <div class="icon-btn" onclick="openNewDM()" title="Chat Baru">✏️</div>
+        <div class="icon-btn" onclick="openCreateGroup()" title="Buat Grup">👥</div>
+        <div class="icon-btn" onclick="openJoinGroup()" title="Join Grup">🔗</div>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="search-input" placeholder="Cari chat..." oninput="filterChats(this.value)" />
+    </div>
+    <div class="chat-tabs">
+      <div class="chat-tab active" onclick="switchChatTab('all')" id="tab-all">Semua</div>
+      <div class="chat-tab" onclick="switchChatTab('dm')" id="tab-dm">DM</div>
+      <div class="chat-tab" onclick="switchChatTab('group')" id="tab-group">Grup</div>
+    </div>
+    <div id="chat-list">
+      <div class="loading-dots">Memuat chat...</div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-avatar-small" id="my-avatar">?</div>
+      <div>
+        <div class="user-name-display" id="my-name">—</div>
+        <div class="user-email-display" id="my-email">—</div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Keluar</button>
+    </div>
+  </div>
+
+  <!-- CHAT AREA -->
+  <div id="chat-area">
+    <div id="empty-state">
+      <div class="big-icon">💬</div>
+      <p>Pilih chat atau mulai percakapan baru</p>
+    </div>
+    <div id="chat-view">
+      <div class="chat-header">
+        <div class="chat-avatar" id="ch-avatar">?</div>
+        <div class="chat-header-info">
+          <div class="chat-header-name" id="ch-name">—</div>
+          <div class="chat-header-sub" id="ch-sub">—</div>
+        </div>
+        <div class="chat-header-actions">
+          <div class="icon-btn" id="group-info-btn" style="display:none" onclick="toggleGroupInfo()" title="Info Grup">ℹ️</div>
+        </div>
+      </div>
+      <div id="messages-container"></div>
+      <div class="chat-input-area">
+        <textarea id="message-input" placeholder="Ketik pesan..." rows="1" onkeydown="handleEnter(event)" oninput="autoResize(this)"></textarea>
+        <button id="send-btn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUP INFO PANEL -->
+  <div id="group-info-panel">
+    <div class="group-info-header">
+      <h3>Info Grup</h3>
+      <div class="icon-btn" onclick="toggleGroupInfo()">✕</div>
+    </div>
+    <div class="group-info-body" id="group-info-body"></div>
+  </div>
+</div>
+
+<!-- MODALS -->
+
+<!-- New DM Modal -->
+<div class="modal-overlay" id="modal-dm">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Chat Baru</div>
+      <div class="modal-close" onclick="closeModal('modal-dm')">✕</div>
+    </div>
+    <div class="form-group">
+      <label>Cari user berdasarkan email</label>
+      <input type="email" id="dm-search-email" placeholder="email@user.com" oninput="searchUserByEmail(this.value)" />
+    </div>
+    <div id="dm-search-results"></div>
+  </div>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal-overlay" id="modal-create-group">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Buat Grup</div>
+      <div class="modal-close" onclick="closeModal('modal-create-group')">✕</div>
+    </div>
+    <div class="form-group">
+      <label>Nama Grup</label>
+      <input type="text" id="cg-name" placeholder="Nama grup kamu" />
+    </div>
+    <div class="form-group">
+      <label>Bio / Deskripsi</label>
+      <textarea class="form-control" id="cg-bio" placeholder="Deskripsi singkat grup..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="createGroup()" id="create-group-btn" style="margin-top:4px">Buat Grup</button>
+  </div>
+</div>
+
+<!-- Join Group Modal -->
+<div class="modal-overlay" id="modal-join-group">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Join Grup</div>
+      <div class="modal-close" onclick="closeModal('modal-join-group')">✕</div>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Masukkan kode invite atau link grup</p>
+    <div class="join-input-wrap">
+      <input type="text" id="join-code-input" placeholder="Kode atau link invite..." />
+      <button onclick="joinGroupByCode()">Join</button>
+    </div>
+    <div id="join-result" style="margin-top:14px;font-size:13px;"></div>
+  </div>
+</div>
+
+<!-- Edit Group Modal (admin only) -->
+<div class="modal-overlay" id="modal-edit-group">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Grup</div>
+      <div class="modal-close" onclick="closeModal('modal-edit-group')">✕</div>
+    </div>
+    <div class="form-group">
+      <label>Nama Grup</label>
+      <input type="text" id="eg-name" placeholder="Nama grup" />
+    </div>
+    <div class="form-group">
+      <label>Bio / Deskripsi</label>
+      <textarea class="form-control" id="eg-bio" placeholder="Deskripsi grup..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="saveGroupEdit()" style="margin-top:4px">Simpan Perubahan</button>
+    <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+      <div class="section-title">Tambah Member</div>
+      <input type="email" id="add-member-email" placeholder="email@member.com" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;margin-bottom:8px" oninput="searchAddMember(this.value)"/>
+      <div id="add-member-results"></div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="section-title">Members</div>
+      <div id="edit-members-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
