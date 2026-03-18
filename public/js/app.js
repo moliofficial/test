@@ -738,8 +738,9 @@ window.saveUsername = async () => {
     await updateDoc(doc(db, 'users', currentUser.uid), { name });
 
     // Update Firebase Auth displayName
+    // updateProfile via firebase-auth (sudah diimport di atas)
     const { updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-    await updateProfile(currentUser, { displayName: name });
+    await updateProfile(auth.currentUser, { displayName: name });
 
     // Update UI sidebar
     document.getElementById('my-name').textContent = name;
@@ -775,8 +776,6 @@ window.addEventListener('hashchange', async () => {
 });
 
 // ===================== DELINE UPLOAD =====================
-import { uploadDeline, isImage, isVideo } from "./deline.js";
-
 let pendingMediaFile = null;
 
 const uploadDelineFile = async (file) => {
