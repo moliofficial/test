@@ -327,14 +327,16 @@ window.showMsgMenu = (e, msgId) => {
 
 window.deleteMsg = async (msgId, chatType) => {
   document.getElementById('msg-ctx-menu')?.remove();
+  if (!msgId || !chatType) return showToast('Error: data tidak lengkap', 'error');
   if (!confirm('Hapus pesan ini?')) return;
   try {
     const colName = chatType === 'dm' ? 'messages' : 'group_messages';
-    await deleteDoc(doc(db, colName, msgId));
+    const msgRef = doc(db, colName, msgId);
+    await deleteDoc(msgRef);
     showToast('Pesan dihapus', 'success');
   } catch(e) {
     showToast('Gagal hapus: ' + e.message, 'error');
-    console.error(e);
+    console.error('Delete error:', e);
   }
 };
 
@@ -346,6 +348,7 @@ window.toggleGroupInfo = () => {
 };
 
 window.openGroupSettings = async (groupId) => {
+  currentGroupId = groupId; // set dulu sebelum apapun
   const screen = document.getElementById('group-settings-screen');
   const body = document.getElementById('group-settings-body');
   screen.style.display = 'flex';
@@ -376,9 +379,18 @@ window.openGroupSettings = async (groupId) => {
     body.innerHTML = `
       <!-- Avatar & Info -->
       <div style="text-align:center;margin-bottom:24px">
-        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
-          display:flex;align-items:center;justify-content:center;font-size:32px;font-family:'Space Mono',monospace;
-          font-weight:700;color:#fff;margin:0 auto 12px">${(g.name||'G')[0].toUpperCase()}</div>
+        <div style="position:relative;display:inline-block;margin-bottom:12px">
+          <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
+            display:flex;align-items:center;justify-content:center;font-size:32px;font-family:'Space Mono',monospace;
+            font-weight:700;color:#fff;overflow:hidden">
+            ${g.avatar ? `<img src="${g.avatar}" style="width:100%;height:100%;object-fit:cover">` : (g.name||'G')[0].toUpperCase()}
+          </div>
+          ${isAdmin ? `<label for="group-avatar-file-${groupId}" style="position:absolute;bottom:-2px;right:-2px;width:26px;height:26px;
+            background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;
+            cursor:pointer;font-size:12px;color:#000;font-weight:700">+</label>
+          <input type="file" id="group-avatar-file-${groupId}" accept="image/*" style="display:none"
+            onchange="uploadGroupAvatar(this,'${groupId}')" />` : ''}
+        </div>
         <div style="font-size:20px;font-weight:700;font-family:'Space Mono',monospace">${escHtml(g.name)}</div>
         <div style="font-size:13px;color:var(--text2);margin-top:6px;line-height:1.5">${escHtml(g.bio||'Belum ada deskripsi')}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:4px">${(g.members||[]).length} member</div>
@@ -445,24 +457,40 @@ window.closeGroupSettings = () => {
 
 // Edit grup dari settings
 window.openGSEdit = async () => {
-  const snap = await getDoc(doc(db, 'groups', currentChat.id));
-  const g = snap.data();
-  document.getElementById('gs-edit-name').value = g.name || '';
-  document.getElementById('gs-edit-bio').value = g.bio || '';
-  currentGroupId = currentChat.id;
-  openModal('modal-gs-edit');
+  if (!currentGroupId) return showToast('Error: grup tidak ditemukan', 'error');
+  try {
+    const snap = await getDoc(doc(db, 'groups', currentGroupId));
+    if (!snap.exists()) return showToast('Grup tidak ditemukan', 'error');
+    const g = snap.data();
+    document.getElementById('gs-edit-name').value = g.name || '';
+    document.getElementById('gs-edit-bio').value = g.bio || '';
+    openModal('modal-gs-edit');
+  } catch(e) {
+    showToast('Gagal: ' + e.message, 'error');
+  }
 };
 
 window.saveGSEdit = async () => {
   const name = document.getElementById('gs-edit-name').value.trim();
   const bio = document.getElementById('gs-edit-bio').value.trim();
   if (!name) return showToast('Nama grup wajib diisi', 'error');
-  await updateDoc(doc(db, 'groups', currentGroupId), { name, bio });
-  showToast('Grup diperbarui!', 'success');
-  closeModal('modal-gs-edit');
-  document.getElementById('gs-title').textContent = name;
-  if (currentChat) document.getElementById('ch-name').textContent = name;
-  await openGroupSettings(currentGroupId);
+  if (!currentGroupId) return showToast('Error: ID grup tidak ditemukan', 'error');
+  const btn = document.querySelector('#modal-gs-edit .btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+  try {
+    await updateDoc(doc(db, 'groups', currentGroupId), { name, bio });
+    showToast('Grup diperbarui!', 'success');
+    closeModal('modal-gs-edit');
+    const titleEl = document.getElementById('gs-title');
+    if (titleEl) titleEl.textContent = name;
+    const chNameEl = document.getElementById('ch-name');
+    if (chNameEl && currentChat?.id === currentGroupId) chNameEl.textContent = name;
+    await openGroupSettings(currentGroupId);
+  } catch(e) {
+    showToast('Gagal simpan: ' + e.message, 'error');
+    console.error('saveGSEdit error:', e);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Simpan'; }
 };
 
 // Jadikan admin
@@ -745,3 +773,356 @@ window.addEventListener('hashchange', async () => {
     await openSettings();
   }
 });
+
+// ===================== DELINE UPLOAD =====================
+import { uploadDeline, isImage, isVideo } from "./deline.js";
+
+let pendingMediaFile = null;
+
+const uploadDelineFile = async (file) => {
+  const ext = file.name?.split('.').pop() || 'bin';
+  const mime = file.type || 'application/octet-stream';
+  const fd = new FormData();
+  fd.append("file", new Blob([await file.arrayBuffer()], { type: mime }), `file.${ext}`);
+  const res = await fetch("https://api.deline.web.id/uploader", { method: "POST", body: fd });
+  const data = await res.json();
+  if (data.status === false) throw new Error(data.message || "Upload gagal");
+  const link = data?.result?.link || data?.url || data?.path;
+  if (!link) throw new Error("Tidak ada link dari server");
+  return link;
+};
+
+const checkIsImage = (url) => /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url) || url.includes('image');
+const checkIsVideo = (url) => /\.(mp4|webm|mov|avi)(\?|$)/i.test(url) || url.includes('video');
+
+// ===================== MEDIA DI CHAT =====================
+window.handleMediaSelect = (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  pendingMediaFile = file;
+  input.value = '';
+
+  const preview = document.getElementById('media-preview-content');
+  const url = URL.createObjectURL(file);
+
+  if (file.type.startsWith('image/')) {
+    preview.innerHTML = `<img src="${url}" style="max-width:100%;max-height:300px;border-radius:10px;object-fit:contain" />`;
+  } else if (file.type.startsWith('video/')) {
+    preview.innerHTML = `<video src="${url}" controls style="max-width:100%;max-height:300px;border-radius:10px"></video>`;
+  } else {
+    preview.innerHTML = `<div style="padding:20px;color:var(--text2)">📄 ${escHtml(file.name)}</div>`;
+  }
+
+  document.getElementById('media-caption').value = '';
+  openModal('modal-media-preview');
+};
+
+window.sendMedia = async () => {
+  if (!pendingMediaFile || !currentChat) return;
+  const btn = document.getElementById('send-media-btn');
+  btn.disabled = true; btn.textContent = 'Mengupload...';
+
+  try {
+    const url = await uploadDelineFile(pendingMediaFile);
+    const caption = document.getElementById('media-caption').value.trim();
+    const isImg = pendingMediaFile.type.startsWith('image/');
+    const isVid = pendingMediaFile.type.startsWith('video/');
+    const mediaType = isImg ? 'image' : isVid ? 'video' : 'file';
+
+    const msgData = {
+      sender_id: currentUser.uid,
+      sender_name: currentUser.displayName || 'User',
+      text: caption,
+      mediaUrl: url,
+      mediaType,
+      timestamp: serverTimestamp()
+    };
+
+    if (currentChat.type === 'dm') {
+      await addDoc(collection(db, 'messages'), { ...msgData, chat_id: currentChat.id });
+      await updateDoc(doc(db, 'chats', currentChat.id), {
+        lastMessage: isImg ? '📷 Foto' : isVid ? '🎥 Video' : '📎 File',
+        lastMessageAt: serverTimestamp()
+      });
+    } else {
+      await addDoc(collection(db, 'group_messages'), { ...msgData, group_id: currentChat.id });
+      await updateDoc(doc(db, 'groups', currentChat.id), {
+        lastMessage: isImg ? '📷 Foto' : isVid ? '🎥 Video' : '📎 File',
+        lastMessageAt: serverTimestamp()
+      });
+    }
+
+    closeModal('modal-media-preview');
+    pendingMediaFile = null;
+    showToast('Media terkirim!', 'success');
+  } catch(e) {
+    showToast('Gagal upload: ' + e.message, 'error');
+  }
+
+  btn.disabled = false; btn.textContent = 'Kirim';
+};
+
+// Override renderMessages untuk support media
+const _origRenderMessages = window.renderMessages;
+function renderMessages(msgs) {
+  const container = document.getElementById('messages-container');
+  const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+  if (!msgs.length) { container.innerHTML = '<div class="loading-dots">Belum ada pesan. Mulai ngobrol! 👋</div>'; return; }
+
+  let html = '', lastDate = '';
+  msgs.forEach(msg => {
+    const isOut = msg.sender_id === currentUser.uid;
+    const ts = msg.timestamp?.toDate();
+    const dateStr = ts ? ts.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long' }) : '';
+    const timeStr = ts ? ts.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) : '';
+    if (dateStr && dateStr !== lastDate) {
+      html += `<div class="msg-date-divider"><span>${dateStr}</span></div>`;
+      lastDate = dateStr;
+    }
+    const showSender = !isOut && currentChat.type === 'group';
+    const isGroupAdmin = currentChat.type === 'group' &&
+      (currentChat.data?.admin === currentUser.uid || (currentChat.data?.admins||[]).includes(currentUser.uid));
+    const canDelete = isOut || isGroupAdmin;
+
+    // Build media content
+    let mediaHtml = '';
+    if (msg.mediaUrl) {
+      if (msg.mediaType === 'image') {
+        mediaHtml = `<div class="msg-media"><img src="${msg.mediaUrl}" onclick="viewMedia('${msg.mediaUrl}')" loading="lazy" /></div>`;
+      } else if (msg.mediaType === 'video') {
+        mediaHtml = `<div class="msg-media"><video src="${msg.mediaUrl}" controls preload="metadata"></video></div>`;
+      } else {
+        mediaHtml = `<div><a href="${msg.mediaUrl}" target="_blank" style="color:var(--accent);font-size:13px">📎 Unduh File</a></div>`;
+      }
+    }
+
+    html += `<div class="msg-row ${isOut?'out':'in'}" id="msg-${msg.id}">
+      <div class="msg-bubble"
+        ${canDelete ? `oncontextmenu="showMsgMenu(event,'${msg.id}','${currentChat.type}');return false;"
+        ontouchstart="startLP(event,'${msg.id}','${currentChat.type}')" ontouchend="cancelLP()" ontouchmove="cancelLP()"` : ''}>
+        ${showSender ? `<div class="msg-sender">${escHtml(msg.sender_name||'User')}</div>` : ''}
+        ${mediaHtml}
+        ${msg.text ? `<div>${escHtml(msg.text)}</div>` : ''}
+        <div class="msg-time">${timeStr}</div>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+  if (wasAtBottom || msgs.length < 5) container.scrollTop = container.scrollHeight;
+}
+
+window.viewMedia = (url) => { window.open(url, '_blank'); };
+
+// Fix startLP untuk include chatType
+window.startLP = (e, msgId, chatType) => {
+  longPressTimer = setTimeout(() => showMsgMenu(e, msgId, chatType), 600);
+};
+
+// Fix showMsgMenu untuk include chatType
+window.showMsgMenu = (e, msgId, chatType) => {
+  e.preventDefault();
+  if (!msgId) return;
+  const type = chatType || currentChat?.type || 'dm';
+  document.getElementById('msg-ctx-menu')?.remove();
+  const menu = document.createElement('div');
+  menu.id = 'msg-ctx-menu';
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  menu.style.cssText = `position:fixed;left:${Math.min(x,window.innerWidth-160)}px;top:${Math.min(y,window.innerHeight-80)}px;
+    background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:9999;
+    min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,0.5)`;
+  menu.innerHTML = `<div onclick="deleteMsg('${msgId}','${type}')"
+    style="padding:10px 14px;cursor:pointer;color:var(--danger);font-size:14px;border-radius:7px;display:flex;align-items:center;gap:8px"
+    onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='none'">🗑️ Hapus Pesan</div>`;
+  document.body.appendChild(menu);
+  setTimeout(() => {
+    document.addEventListener('click', () => menu.remove(), { once: true });
+    document.addEventListener('touchstart', () => menu.remove(), { once: true });
+  }, 100);
+};
+
+// ===================== FOTO PROFIL =====================
+window.openAvatarEdit = () => {
+  const url = prompt('Masukkan link foto profil (URL gambar):');
+  if (!url || !url.startsWith('http')) return showToast('Link tidak valid', 'error');
+  saveAvatarUrl(url);
+};
+
+window.uploadAvatar = async (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  showToast('Mengupload foto...', '');
+  try {
+    const url = await uploadDelineFile(file);
+    await saveAvatarUrl(url);
+  } catch(e) { showToast('Gagal upload: ' + e.message, 'error'); }
+  input.value = '';
+};
+
+async function saveAvatarUrl(url) {
+  try {
+    await updateDoc(doc(db, 'users', currentUser.uid), { avatar: url });
+    // Update avatar di sidebar
+    const myAvEl = document.getElementById('my-avatar');
+    myAvEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    showToast('Foto profil diperbarui!', 'success');
+    // Refresh settings jika terbuka
+    const stAv = document.getElementById('st-avatar');
+    if (stAv) stAv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } catch(e) { showToast('Gagal simpan: ' + e.message, 'error'); }
+}
+
+// ===================== AVATAR GRUP =====================
+window.uploadGroupAvatar = async (input, groupId) => {
+  const file = input.files[0];
+  if (!file) return;
+  showToast('Mengupload avatar grup...', '');
+  try {
+    const url = await uploadDelineFile(file);
+    await updateDoc(doc(db, 'groups', groupId), { avatar: url });
+    showToast('Avatar grup diperbarui!', 'success');
+    await openGroupSettings(groupId);
+    // Update header chat
+    if (currentChat?.id === groupId) {
+      document.getElementById('ch-avatar').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    }
+  } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
+  input.value = '';
+};
+
+// ===================== STATUS (STORY) =====================
+window.openStatus = async () => {
+  const screen = document.getElementById('status-screen');
+  screen.style.display = 'flex';
+  setRoute('/status');
+  document.getElementById('my-status-initial').textContent = (currentUser.displayName||'U')[0].toUpperCase();
+  await loadStatuses();
+};
+
+window.closeStatus = () => {
+  document.getElementById('status-screen').style.display = 'none';
+  clearRoute();
+};
+
+async function loadStatuses() {
+  const container = document.getElementById('status-list');
+  const expiry = Date.now() - 24 * 60 * 60 * 1000; // 24 jam lalu
+  try {
+    const q = query(collection(db, 'statuses'), where('expiresAt', '>', new Date(expiry)));
+    const snap = await getDocs(q);
+    const statuses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.uid !== currentUser.uid)
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+    // Cek status sendiri
+    const mySnap = await getDocs(query(collection(db, 'statuses'),
+      where('uid', '==', currentUser.uid),
+      where('expiresAt', '>', new Date(expiry))
+    ));
+    const myStatus = mySnap.docs[0];
+    if (myStatus) {
+      document.getElementById('my-status-time').textContent = formatTime(myStatus.data().createdAt?.toDate());
+      document.getElementById('my-status-avatar').classList.add('status-ring');
+      document.getElementById('my-status-avatar').onclick = () => viewStatus(myStatus.id, myStatus.data());
+    }
+
+    if (!statuses.length) { container.innerHTML = '<div class="loading-dots">Tidak ada status terbaru</div>'; return; }
+
+    // Fetch user data
+    const userIds = [...new Set(statuses.map(s => s.uid))];
+    const userDocs = await Promise.all(userIds.map(uid => getDoc(doc(db, 'users', uid))));
+    const users = {};
+    userDocs.forEach(d => { if (d.exists()) users[d.id] = d.data(); });
+
+    container.innerHTML = statuses.map(s => {
+      const u = users[s.uid] || {};
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;border-bottom:1px solid var(--border)"
+        onclick="viewStatus('${s.id}',${JSON.stringify(JSON.stringify(s)).slice(1,-1)})">
+        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
+          display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;
+          border:2px solid var(--accent);flex-shrink:0;overflow:hidden">
+          ${u.avatar ? `<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover">` : (u.name||'U')[0].toUpperCase()}
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:600">${escHtml(u.name||'User')}</div>
+          <div style="font-size:12px;color:var(--text2)">${formatTime(s.createdAt?.toDate())}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="color:var(--danger);font-size:13px">Error: ${e.message}</div>`;
+  }
+}
+
+window.handleStatusUpload = async (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  showToast('Mengupload status...', '');
+  try {
+    const url = await uploadDelineFile(file);
+    const caption = prompt('Tambah keterangan (opsional):') || '';
+    const isImg = file.type.startsWith('image/');
+    const isVid = file.type.startsWith('video/');
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await addDoc(collection(db, 'statuses'), {
+      uid: currentUser.uid,
+      name: currentUser.displayName || 'User',
+      mediaUrl: url,
+      mediaType: isImg ? 'image' : isVid ? 'video' : 'file',
+      caption,
+      createdAt: serverTimestamp(),
+      expiresAt
+    });
+    showToast('Status berhasil dibuat!', 'success');
+    await loadStatuses();
+  } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
+  input.value = '';
+};
+
+let statusTimer = null;
+window.viewStatus = (statusId, statusData) => {
+  if (typeof statusData === 'string') { try { statusData = JSON.parse(statusData); } catch(e) {} }
+  const viewer = document.getElementById('status-viewer');
+  viewer.style.display = 'flex';
+
+  document.getElementById('sv-name').textContent = statusData.name || 'User';
+  document.getElementById('sv-time').textContent = statusData.createdAt?.toDate ? formatTime(statusData.createdAt.toDate()) : 'baru saja';
+  document.getElementById('sv-avatar').textContent = (statusData.name||'U')[0].toUpperCase();
+  document.getElementById('sv-caption').textContent = statusData.caption || '';
+  document.getElementById('sv-delete').style.display = statusData.uid === currentUser.uid ? 'block' : 'none';
+  document.getElementById('sv-delete').onclick = () => deleteMyStatus(statusId);
+
+  const content = document.getElementById('sv-content');
+  if (statusData.mediaType === 'image') {
+    content.innerHTML = `<img src="${statusData.mediaUrl}" style="max-width:100%;max-height:80vh;object-fit:contain" />`;
+  } else if (statusData.mediaType === 'video') {
+    content.innerHTML = `<video src="${statusData.mediaUrl}" autoplay controls style="max-width:100%;max-height:80vh"></video>`;
+  }
+
+  // Progress bar 5 detik untuk gambar
+  if (statusData.mediaType === 'image') {
+    const prog = document.getElementById('sv-progress');
+    prog.style.transition = 'none'; prog.style.width = '0%';
+    setTimeout(() => { prog.style.transition = 'width 5s linear'; prog.style.width = '100%'; }, 50);
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => closeStatusViewer(), 5000);
+  }
+};
+
+window.closeStatusViewer = () => {
+  document.getElementById('status-viewer').style.display = 'none';
+  if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
+  document.getElementById('sv-progress').style.width = '0%';
+};
+
+window.deleteMyStatus = async (statusId) => {
+  if (!statusId || !confirm('Hapus status ini?')) return;
+  try {
+    await deleteDoc(doc(db, 'statuses', statusId));
+    closeStatusViewer();
+    showToast('Status dihapus', 'success');
+    await loadStatuses();
+  } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
+};
