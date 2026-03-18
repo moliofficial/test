@@ -44,6 +44,29 @@ let chatList = [];
 let currentTab = 'all';
 let currentGroupId = null;
 
+// ===================== ROUTER =====================
+function setRoute(type, id) {
+  window.location.hash = `/${type}/${id}`;
+}
+
+function clearRoute() {
+  window.location.hash = '';
+}
+
+async function handleRoute() {
+  const hash = window.location.hash; // misal #/dm/abc123
+  if (!hash || hash === '#' || hash === '#/') return;
+  const parts = hash.replace('#/', '').split('/');
+  if (parts.length < 2) return;
+  const [type, id] = parts;
+  if ((type === 'dm' || type === 'group') && id) {
+    await openChat(type, id);
+  }
+}
+
+window.addEventListener('hashchange', handleRoute);
+
+
 // ===================== AUTH =====================
 window.doLoginGoogle = async () => {
   const btn = document.getElementById('login-google-btn');
@@ -88,6 +111,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('my-avatar').textContent = (user.displayName || 'U')[0].toUpperCase();
 
     loadChatList();
+    setTimeout(handleRoute, 800);
   } else {
     currentUser = null;
     document.getElementById('auth-screen').style.display = 'flex';
@@ -213,6 +237,7 @@ window.openChat = async (type, id) => {
   }
 
   currentChat = { type, id, data };
+  setRoute(type, id);
 
   const name = type === 'dm' ? (data._otherUser?.name || 'User') : data.name;
   const initial = name[0]?.toUpperCase() || '?';
