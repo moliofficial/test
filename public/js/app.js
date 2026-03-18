@@ -14,6 +14,7 @@ let chatList = [];
 let currentTab = 'all';
 let currentGroupId = null;
 let longPressTimer = null;
+const userNameCache = {}; // uid -> {name, avatar}
 
 // ===================== MOBILE =====================
 function isMobile() { return window.innerWidth <= 768; }
@@ -289,9 +290,19 @@ function listenMessages(type, id) {
   const colName = type === 'dm' ? 'messages' : 'group_messages';
   const fieldName = type === 'dm' ? 'chat_id' : 'group_id';
   const q = query(collection(db, colName), where(fieldName, '==', id));
-  unsubMessages = onSnapshot(q, (snap) => {
+  unsubMessages = onSnapshot(q, async (snap) => {
     const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a,b) => (a.timestamp?.seconds||0) - (b.timestamp?.seconds||0));
+
+    // Fetch nama terbaru untuk semua sender yang belum di-cache
+    const senderIds = [...new Set(msgs.map(m => m.sender_id).filter(Boolean))];
+    await Promise.all(senderIds.map(async uid => {
+      if (!userNameCache[uid]) {
+        const snap = await getDoc(doc(db, 'users', uid));
+        if (snap.exists()) userNameCache[uid] = snap.data();
+      }
+    }));
+
     renderMessages(msgs);
   });
 }
@@ -983,7 +994,7 @@ function renderMessages(msgs) {
       <div class="msg-bubble"
         ${canDelete ? `oncontextmenu="showMsgMenu(event,'${msg.id}','${currentChat.type}');return false;"
         ontouchstart="startLP(event,'${msg.id}','${currentChat.type}')" ontouchend="cancelLP()" ontouchmove="cancelLP()"` : ''}>
-        ${showSender ? `<div class="msg-sender">${escHtml(msg.sender_name||'User')}</div>` : ''}
+        ${showSender ? `<div class="msg-sender" id="sender-${msg.sender_id}-${msg.id}" data-uid="${msg.sender_id}">${escHtml(userNameCache[msg.sender_id]?.name || msg.sender_name||'User')}</div>` : ''}
         ${mediaHtml}
         ${msg.text ? `<div>${escHtml(msg.text)}</div>` : ''}
         <div class="msg-time">${timeStr}</div>
@@ -1185,22 +1196,50 @@ window.handleStatusUpload = async (input) => {
 };
 
 let statusTimer = null;
-window.viewStatus = (statusId, statusData) => {
-  if (!statusData) return showToast('Data status tidak ditemukan', 'error');
-  if (typeof statusData === 'string') {
-    try { statusData = JSON.parse(statusData); } catch(e) { return showToast('Gagal buka status', 'error'); }
+// State untuk multi-slide status
+let currentStatusQueue = [];
+let currentStatusIndex = 0;
+
+window.viewStatusByUser = async (uid, startId) => {
+  // Ambil semua status user ini yang masih aktif
+  const expiryMs = Date.now() - 24 * 60 * 60 * 1000;
+  try {
+    const snap = await getDocs(collection(db, 'statuses'));
+    const userStatuses = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => {
+        if (s.uid !== uid) return false;
+        const exp = s.expiresAt?.toDate ? s.expiresAt.toDate().getTime() : (s.expiresAt?.seconds * 1000 || 0);
+        return exp > expiryMs;
+      })
+      .sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+
+    if (!userStatuses.length) return showToast('Status tidak tersedia', 'error');
+
+    currentStatusQueue = userStatuses;
+    currentStatusIndex = startId ? userStatuses.findIndex(s => s.id === startId) : 0;
+    if (currentStatusIndex < 0) currentStatusIndex = 0;
+
+    showStatusSlide(currentStatusIndex);
+  } catch(e) {
+    showToast('Gagal load status: ' + e.message, 'error');
   }
+};
+
+function showStatusSlide(idx) {
+  if (idx >= currentStatusQueue.length) { closeStatusViewer(); return; }
+  const statusData = currentStatusQueue[idx];
+  const statusId = statusData.id;
+  currentStatusIndex = idx;
 
   const viewer = document.getElementById('status-viewer');
   viewer.style.display = 'flex';
   hideBottomNav();
 
-  // Handle nama
-  const name = statusData.name || statusData.userName || 'User';
+  const name = statusData.name || 'User';
   document.getElementById('sv-name').textContent = name;
   document.getElementById('sv-avatar').textContent = name[0].toUpperCase();
 
-  // Handle timestamp
   let timeStr = 'baru saja';
   if (statusData.createdAt) {
     const ts = statusData.createdAt.toDate ? statusData.createdAt.toDate() : new Date(statusData.createdAt.seconds * 1000);
@@ -1213,29 +1252,92 @@ window.viewStatus = (statusId, statusData) => {
   document.getElementById('sv-delete').style.display = isOwner ? 'block' : 'none';
   if (isOwner) document.getElementById('sv-delete').onclick = () => deleteMyStatus(statusId);
 
-  // Tampilkan media
+  // Progress bars untuk multi-slide
+  const prog = document.getElementById('sv-progress');
+  prog.style.transition = 'none'; prog.style.width = '0%';
+
+  // Update progress segments
+  updateProgressSegments(idx, currentStatusQueue.length);
+
   const svContent = document.getElementById('sv-content');
   if (!statusData.mediaUrl) {
-    svContent.innerHTML = '<div style="color:var(--text2);padding:20px">Media tidak tersedia</div>';
+    svContent.innerHTML = '<div style="color:var(--text2);padding:20px;text-align:center">Media tidak tersedia</div>';
     return;
   }
 
+  let duration = 5000;
   if (statusData.mediaType === 'image') {
-    svContent.innerHTML = `<img src="${statusData.mediaUrl}" style="max-width:100%;max-height:80vh;object-fit:contain" onerror="this.parentElement.innerHTML='<div style=color:var(--danger);padding:20px>Gagal load gambar</div>'" />`;
+    svContent.innerHTML = `<img src="${statusData.mediaUrl}" style="max-width:100%;max-height:80vh;object-fit:contain" />`;
   } else if (statusData.mediaType === 'video') {
-    svContent.innerHTML = `<video src="${statusData.mediaUrl}" autoplay controls style="max-width:100%;max-height:80vh" playsinline></video>`;
-  } else {
-    svContent.innerHTML = `<a href="${statusData.mediaUrl}" target="_blank" style="color:var(--accent);font-size:16px">📎 Buka File</a>`;
+    svContent.innerHTML = `<video src="${statusData.mediaUrl}" autoplay style="max-width:100%;max-height:80vh" playsinline onloadedmetadata="this.play()"></video>`;
+    duration = 30000; // video max 30s
   }
 
-  // Progress bar 5 detik untuk gambar
-  if (statusData.mediaType === 'image') {
-    const prog = document.getElementById('sv-progress');
-    prog.style.transition = 'none'; prog.style.width = '0%';
-    setTimeout(() => { prog.style.transition = 'width 5s linear'; prog.style.width = '100%'; }, 50);
-    if (statusTimer) clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => closeStatusViewer(), 5000);
+  // Catat view
+  recordStatusView(statusId, statusData.uid);
+
+  // Tampilkan tombol viewers kalau milik sendiri
+  const viewersBtn = document.getElementById('sv-viewers-btn');
+  if (viewersBtn) {
+    viewersBtn.style.display = isOwner ? 'block' : 'none';
+    if (isOwner) {
+      // Hitung viewers
+      getDocs(collection(db, 'statuses', statusId, 'views')).then(snap => {
+        const countEl = document.getElementById('sv-view-count');
+        if (countEl) countEl.textContent = snap.size;
+      }).catch(() => {});
+    }
   }
+
+  // Auto next
+  if (statusTimer) clearTimeout(statusTimer);
+  setTimeout(() => {
+    prog.style.transition = `width ${duration/1000}s linear`;
+    prog.style.width = '100%';
+  }, 50);
+  statusTimer = setTimeout(() => showStatusSlide(idx + 1), duration);
+}
+
+function updateProgressSegments(currentIdx, total) {
+  const container = document.getElementById('sv-progress-container');
+  if (!container) return;
+  container.innerHTML = Array.from({length: total}, (_, i) => `
+    <div style="flex:1;height:3px;background:${i < currentIdx ? 'var(--accent)' : i === currentIdx ? 'transparent' : 'rgba(255,255,255,0.3)'};border-radius:2px;overflow:hidden;margin:0 1px">
+      ${i === currentIdx ? '<div id="sv-progress" style="height:100%;background:var(--accent);width:0%"></div>' : ''}
+    </div>
+  `).join('');
+}
+
+async function recordStatusView(statusId, ownerUid) {
+  if (ownerUid === currentUser.uid) return; // jangan catat view sendiri
+  try {
+    const viewRef = doc(db, 'statuses', statusId, 'views', currentUser.uid);
+    await setDoc(viewRef, {
+      uid: currentUser.uid,
+      name: currentUser.displayName || 'User',
+      viewedAt: serverTimestamp()
+    });
+  } catch(e) {} // silent fail
+}
+
+window.viewStatus = (statusId, statusData) => {
+  if (!statusData) return showToast('Data status tidak ditemukan', 'error');
+  if (typeof statusData === 'string') {
+    try { statusData = JSON.parse(statusData); } catch(e) { return; }
+  }
+  viewStatusByUser(statusData.uid, statusId);
+};
+
+// Show viewers (siapa yang lihat status)
+window.showStatusViewers = async (statusId) => {
+  try {
+    const snap = await getDocs(collection(db, 'statuses', statusId, 'views'));
+    const viewers = snap.docs.map(d => d.data());
+    if (!viewers.length) { showToast('Belum ada yang lihat', ''); return; }
+    const names = viewers.map(v => v.name || 'User').join(', ');
+    alert(`${viewers.length} yang lihat:
+${names}`);
+  } catch(e) { showToast('Gagal load viewers', 'error'); }
 };
 
 window.closeStatusViewer = () => {
@@ -1321,3 +1423,28 @@ window.viewStatusEncoded = (encoded) => {
     showToast('Gagal buka status', 'error');
   }
 };
+
+// Handle tap kiri/kanan di status viewer
+window.handleStatusTap = (e) => {
+  const viewer = document.getElementById('status-viewer');
+  const x = e.clientX;
+  const w = viewer.offsetWidth;
+  if (x < w * 0.35) {
+    // Tap kiri - mundur
+    if (currentStatusIndex > 0) showStatusSlide(currentStatusIndex - 1);
+  } else if (x > w * 0.65) {
+    // Tap kanan - maju
+    showStatusSlide(currentStatusIndex + 1);
+  }
+};
+
+// Show viewers untuk status yang sedang ditampilkan
+window.showCurrentStatusViewers = async () => {
+  const status = currentStatusQueue[currentStatusIndex];
+  if (!status) return;
+  await showStatusViewers(status.id);
+};
+
+// Update view count di footer saat status tampil
+const _origShowStatusSlide = window.showStatusSlide;
+const origShowSlide = showStatusSlide;
