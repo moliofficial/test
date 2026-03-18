@@ -19,11 +19,11 @@ let longPressTimer = null;
 function isMobile() { return window.innerWidth <= 768; }
 
 function showChatMobile() {
-  if (!isMobile()) return;
   document.getElementById('sidebar').classList.add('hidden');
   const ca = document.getElementById('chat-area');
   ca.classList.add('mobile-active');
   ca.style.display = 'flex';
+  hideBottomNav();
   setTimeout(() => {
     const mc = document.getElementById('messages-container');
     if (mc) mc.scrollTop = mc.scrollHeight;
