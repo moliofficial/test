@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: siapa aja yang login bisa baca, hanya pemilik yang bisa edit
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Chats (DM)
+    match /chats/{chatId} {
+      allow read, write: if true;
+    }
+
+    // Messages
+    match /messages/{msgId} {
+      allow read, write: if true;
+    }
+
+    // Groups
+    match /groups/{groupId} {
+      allow read, write: if true;
+    }
+
+    // Group Messages
+    match /group_messages/{msgId} {
+      allow read, write: if true;
+    }
+  }
+}
