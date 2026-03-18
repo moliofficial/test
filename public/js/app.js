@@ -675,8 +675,16 @@ window.openSettings = async () => {
   const snap = await getDoc(doc(db, 'users', currentUser.uid));
   const userData = snap.exists() ? snap.data() : {};
 
-  document.getElementById('st-avatar').textContent = (currentUser.displayName||'U')[0].toUpperCase();
-  document.getElementById('st-name').textContent = currentUser.displayName || 'User';
+  // Tampilkan avatar
+  const stAv = document.getElementById('st-avatar');
+  if (userData.avatar) {
+    stAv.innerHTML = `<img src="${userData.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    // Update avatar di sidebar juga
+    document.getElementById('my-avatar').innerHTML = `<img src="${userData.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    stAv.textContent = (currentUser.displayName||'U')[0].toUpperCase();
+  }
+  document.getElementById('st-name').textContent = userData.name || currentUser.displayName || 'User';
   document.getElementById('st-email').textContent = currentUser.email;
   document.getElementById('st-username-input').value = userData.name || currentUser.displayName || '';
 
@@ -698,21 +706,29 @@ window.saveUsername = async () => {
   btn.disabled = true; btn.textContent = 'Menyimpan...';
 
   try {
-    // Update Firestore
-    await updateDoc(doc(db, 'users', currentUser.uid), { name });
+    // Ambil avatar terkini — cek dari img element di settings
+    const stAvEl = document.getElementById('st-avatar');
+    const imgEl = stAvEl?.querySelector('img');
+    const avatarUrl = imgEl ? imgEl.src : '';
+
+    // Update Firestore - simpan nama + avatar sekaligus
+    const updateData = { name };
+    if (avatarUrl) updateData.avatar = avatarUrl;
+    await updateDoc(doc(db, 'users', currentUser.uid), updateData);
 
     // Update Firebase Auth displayName
-    // updateProfile via firebase-auth (sudah diimport di atas)
     const { updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
     await updateProfile(auth.currentUser, { displayName: name });
 
     // Update UI sidebar
     document.getElementById('my-name').textContent = name;
     document.getElementById('st-name').textContent = name;
-    document.getElementById('st-avatar').textContent = name[0].toUpperCase();
-    document.getElementById('my-avatar').textContent = name[0].toUpperCase();
+    if (!avatarUrl) {
+      document.getElementById('st-avatar').textContent = name[0].toUpperCase();
+      document.getElementById('my-avatar').textContent = name[0].toUpperCase();
+    }
 
-    showToast('Username berhasil diperbarui!', 'success');
+    showToast('Profil berhasil diperbarui!', 'success');
   } catch(e) {
     showToast('Gagal: ' + e.message, 'error');
   }
@@ -970,22 +986,28 @@ window.closeStatus = () => {
 
 async function loadStatuses() {
   const container = document.getElementById('status-list');
-  const expiry = Date.now() - 24 * 60 * 60 * 1000; // 24 jam lalu
+  const expiryMs = Date.now() - 24 * 60 * 60 * 1000; // 24 jam lalu
   try {
-    const q = query(collection(db, 'statuses'), where('expiresAt', '>', new Date(expiry)));
-    const snap = await getDocs(q);
-    const statuses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    // Ambil semua status, filter expiry di client (hindari composite index)
+    const snap = await getDocs(collection(db, 'statuses'));
+    const allStatuses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => {
+        const exp = s.expiresAt?.toDate ? s.expiresAt.toDate().getTime() : (s.expiresAt?.seconds * 1000 || 0);
+        return exp > expiryMs;
+      });
+
+    const statuses = allStatuses
       .filter(s => s.uid !== currentUser.uid)
       .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 
     // Cek status sendiri
-    const mySnap = await getDocs(query(collection(db, 'statuses'),
-      where('uid', '==', currentUser.uid),
-      where('expiresAt', '>', new Date(expiry))
-    ));
+    const myStatuses = allStatuses.filter(s => s.uid === currentUser.uid);
+    const mySnap = { docs: myStatuses.map(s => ({ id: s.id, data: () => s })) };
+    if (false) { // dummy block untuk kompatibilitas kode di bawah
+    }
     const myStatus = mySnap.docs[0];
     if (myStatus) {
-      document.getElementById('my-status-time').textContent = formatTime(myStatus.data().createdAt?.toDate());
+      document.getElementById('my-status-time').textContent = formatTime(myStatus.data().createdAt?.toDate ? myStatus.data().createdAt.toDate() : new Date());
       document.getElementById('my-status-avatar').classList.add('status-ring');
       document.getElementById('my-status-avatar').onclick = () => viewStatus(myStatus.id, myStatus.data());
     }
