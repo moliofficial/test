@@ -794,14 +794,6 @@
         <div class="user-name-display" id="my-name">—</div>
         <div class="user-email-display" id="my-email">—</div>
       </div>
-      <div class="header-actions">
-        <div class="icon-btn" onclick="openNewDM()" title="Chat Baru">✏️</div>
-        <div class="icon-btn" onclick="openCreateGroup()" title="Buat Grup">👥</div>
-        <div class="icon-btn" onclick="openJoinGroup()" title="Join Grup">🔗</div>
-        <div class="icon-btn" onclick="openStatus()" title="Status">🟢</div>
-        <div class="icon-btn" onclick="openSettings()" title="Pengaturan">⚙️</div>
-        <div class="icon-btn" onclick="doLogout()" title="Keluar" style="color:var(--danger)">⏻</div>
-      </div>
     </div>
     <div class="search-wrap">
       <input type="text" id="search-input" placeholder="Cari chat..." oninput="filterChats(this.value)" />
@@ -811,7 +803,7 @@
       <div class="chat-tab" onclick="switchChatTab('dm')" id="tab-dm">DM</div>
       <div class="chat-tab" onclick="switchChatTab('group')" id="tab-group">Grup</div>
     </div>
-    <div id="chat-list">
+    <div id="chat-list" style="padding-bottom:70px">
       <div class="loading-dots">Memuat chat...</div>
     </div>
 
@@ -1159,6 +1151,75 @@
 .msg-media video { width: 100%; display: block; border-radius: 8px; }
 /* Status avatar ring */
 .status-ring { border: 2px solid var(--accent) !important; }
+</style>
+
+<!-- BOTTOM NAVBAR -->
+<div id="bottom-nav" style="display:none;position:fixed;bottom:0;left:0;right:0;height:60px;
+  background:var(--surface);border-top:1px solid var(--border);z-index:50;
+  display:flex;align-items:center;justify-content:space-around;padding:0 8px;
+  padding-bottom:env(safe-area-inset-bottom);">
+
+  <div class="nav-item" onclick="switchBottomTab('chats')" id="nav-chats" title="Chat">
+    <div class="nav-icon">💬</div>
+    <div class="nav-label">Chat</div>
+  </div>
+  <div class="nav-item" onclick="openNewDM()" title="DM Baru">
+    <div class="nav-icon">✏️</div>
+    <div class="nav-label">DM</div>
+  </div>
+  <div class="nav-item" onclick="openCreateGroup()" title="Buat Grup">
+    <div class="nav-icon">👥</div>
+    <div class="nav-label">Grup</div>
+  </div>
+  <div class="nav-item" onclick="openJoinGroup()" title="Join Grup">
+    <div class="nav-icon">🔗</div>
+    <div class="nav-label">Join</div>
+  </div>
+  <div class="nav-item" onclick="openStatus()" id="nav-status" title="Status">
+    <div class="nav-icon">🟢</div>
+    <div class="nav-label">Status</div>
+  </div>
+  <div class="nav-item" onclick="openSettings()" id="nav-settings" title="Pengaturan">
+    <div class="nav-icon">⚙️</div>
+    <div class="nav-label">Setting</div>
+  </div>
+</div>
+
+<style>
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 10px;
+  transition: background .15s;
+  min-width: 48px;
+}
+.nav-item:hover, .nav-item.active {
+  background: var(--surface2);
+}
+.nav-item.active .nav-icon { filter: brightness(1.5); }
+.nav-item.active .nav-label { color: var(--accent); }
+.nav-icon { font-size: 20px; line-height: 1; }
+.nav-label { font-size: 10px; color: var(--text2); font-weight: 500; white-space: nowrap; }
+
+/* Tambah padding bawah untuk sidebar saat mobile */
+@media (max-width: 768px) {
+  #bottom-nav { display: flex !important; }
+  #sidebar { padding-bottom: 60px; }
+}
+
+/* Desktop: sembunyikan bottom nav */
+@media (min-width: 769px) {
+  #bottom-nav { display: none !important; }
+  /* Kembalikan action buttons di header untuk desktop */
+  .sidebar-header { position: relative; }
+  .sidebar-header::after {
+    content: '';
+  }
+}
 </style>
 </body>
 </html>
