@@ -139,7 +139,11 @@ function loadChatList() {
       const data = d.data();
       const otherId = data.participants.find(p => p !== currentUser.uid);
       let otherUser = null;
-      if (otherId) { const s = await getDoc(doc(db, 'users', otherId)); if (s.exists()) otherUser = s.data(); }
+      if (otherId) {
+        // getDoc selalu ambil fresh dari server
+        const s = await getDoc(doc(db, 'users', otherId));
+        if (s.exists()) otherUser = s.data();
+      }
       return { id: d.id, ...data, _otherUser: otherUser };
     }));
     renderAll();
@@ -150,7 +154,42 @@ function loadChatList() {
     renderAll();
   });
 
-  unsubChats = () => { u1(); u2(); };
+  // Listen ke perubahan user lain yang ada di DM — refresh avatar otomatis
+  const userListeners = {};
+  const watchUserAvatars = (userIds) => {
+    userIds.forEach(uid => {
+      if (userListeners[uid] || uid === currentUser.uid) return;
+      userListeners[uid] = onSnapshot(doc(db, 'users', uid), (snap) => {
+        if (!snap.exists()) return;
+        const userData = snap.data();
+        // Update _otherUser di dms array
+        dms = dms.map(d => {
+          if (d._otherUser?.uid === uid) {
+            return { ...d, _otherUser: { ...d._otherUser, ...userData } };
+          }
+          return d;
+        });
+        renderAll();
+      });
+    });
+  };
+
+  // Override renderAll untuk juga watch user avatars
+  const _origRenderAll = renderAll;
+
+  unsubChats = () => {
+    u1(); u2();
+    Object.values(userListeners).forEach(unsub => unsub());
+  };
+
+  // Watch avatars setelah DMs pertama kali loaded — dengan delay kecil
+  const watchInterval = setInterval(() => {
+    const otherIds = dms.map(d => d._otherUser?.uid).filter(Boolean);
+    if (otherIds.length > 0) {
+      watchUserAvatars(otherIds);
+      clearInterval(watchInterval);
+    }
+  }, 1000);
 }
 
 function renderChatList() {
