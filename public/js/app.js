@@ -545,11 +545,14 @@ window.searchUserByEmail = (val) => {
     el.innerHTML = snap.docs.map(d => {
       const u = d.data();
       if (u.uid === currentUser.uid) return '';
+      // Respect privasi: kalau isPublic false, skip
+      if (u.isPublic === false) return '';
+      const emailDisplay = u.showEmail === false ? '' : `<div class="email">${escHtml(u.email)}</div>`;
       return `<div class="user-search-result" onclick="startDM('${u.uid}')">
         <div class="chat-avatar" style="width:38px;height:38px;font-size:15px">${(u.name||'U')[0].toUpperCase()}</div>
-        <div><div class="name">${escHtml(u.name)}</div><div class="email">${escHtml(u.email)}</div></div>
+        <div><div class="name">${escHtml(u.name)}</div>${emailDisplay}</div>
       </div>`;
-    }).join('');
+    }).join('') || '<div style="color:var(--text2);font-size:13px;padding:8px 0">User tidak ditemukan</div>';
   }, 400);
 };
 
@@ -663,3 +666,76 @@ function generateCode(len=10) {
   const c = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   return Array.from({length:len},()=>c[Math.floor(Math.random()*c.length)]).join('');
 }
+
+// ===================== SETTINGS =====================
+window.openSettings = async () => {
+  const screen = document.getElementById('settings-screen');
+  screen.style.display = 'flex';
+  setRoute('/settings');
+
+  // Isi data profil
+  const snap = await getDoc(doc(db, 'users', currentUser.uid));
+  const userData = snap.exists() ? snap.data() : {};
+
+  document.getElementById('st-avatar').textContent = (currentUser.displayName||'U')[0].toUpperCase();
+  document.getElementById('st-name').textContent = currentUser.displayName || 'User';
+  document.getElementById('st-email').textContent = currentUser.email;
+  document.getElementById('st-username-input').value = userData.name || currentUser.displayName || '';
+
+  // Privacy toggles
+  document.getElementById('toggle-show-email').checked = userData.showEmail !== false; // default true
+  document.getElementById('toggle-public').checked = userData.isPublic !== false; // default true
+};
+
+window.closeSettings = () => {
+  document.getElementById('settings-screen').style.display = 'none';
+  clearRoute();
+};
+
+window.saveUsername = async () => {
+  const name = document.getElementById('st-username-input').value.trim();
+  if (!name || name.length < 2) return showToast('Nama minimal 2 karakter', 'error');
+
+  const btn = document.getElementById('save-username-btn');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+  try {
+    // Update Firestore
+    await updateDoc(doc(db, 'users', currentUser.uid), { name });
+
+    // Update Firebase Auth displayName
+    const { updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    await updateProfile(currentUser, { displayName: name });
+
+    // Update UI sidebar
+    document.getElementById('my-name').textContent = name;
+    document.getElementById('st-name').textContent = name;
+    document.getElementById('st-avatar').textContent = name[0].toUpperCase();
+    document.getElementById('my-avatar').textContent = name[0].toUpperCase();
+
+    showToast('Username berhasil diperbarui!', 'success');
+  } catch(e) {
+    showToast('Gagal: ' + e.message, 'error');
+  }
+
+  btn.disabled = false; btn.textContent = 'Simpan Perubahan';
+};
+
+window.savePrivacy = async () => {
+  const showEmail = document.getElementById('toggle-show-email').checked;
+  const isPublic = document.getElementById('toggle-public').checked;
+  try {
+    await updateDoc(doc(db, 'users', currentUser.uid), { showEmail, isPublic });
+    showToast('Pengaturan privasi disimpan', 'success');
+  } catch(e) {
+    showToast('Gagal simpan: ' + e.message, 'error');
+  }
+};
+
+// Handle route /settings
+const _origHandleRoute = handleRoute;
+window.addEventListener('hashchange', async () => {
+  if (window.location.hash === '#/settings') {
+    await openSettings();
+  }
+});
