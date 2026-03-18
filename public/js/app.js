@@ -85,9 +85,13 @@ window.doLogout = async () => {
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
+    // Cek apakah sudah punya userCode
+    const existingSnap = await getDoc(doc(db, 'users', user.uid));
+    const existingCode = existingSnap.exists() ? existingSnap.data().userCode : null;
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid, name: user.displayName || 'User',
       email: user.email, avatar: user.photoURL || '',
+      userCode: existingCode || generateCode(8), // kode unik 8 karakter
       updatedAt: serverTimestamp()
     }, { merge: true });
     document.getElementById('auth-screen').style.display = 'none';
@@ -206,7 +210,14 @@ window.openChat = async (type, id) => {
   const initial = (name||'?')[0].toUpperCase();
   const sub = type === 'dm' ? (data._otherUser?.email||'') : `${data.members?.length||0} member`;
 
-  document.getElementById('ch-avatar').textContent = initial;
+  // Update avatar header
+  const chAvEl = document.getElementById('ch-avatar');
+  const avatarUrl = type === 'dm' ? (data._otherUser?.avatar||'') : (data.avatar||'');
+  if (avatarUrl) {
+    chAvEl.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    chAvEl.textContent = initial;
+  }
   document.getElementById('ch-name').textContent = name;
   document.getElementById('ch-sub').textContent = sub;
   document.getElementById('group-info-btn').style.display = type === 'group' ? 'flex' : 'none';
@@ -534,23 +545,47 @@ window.openNewDM = () => {
 let dmTimer;
 window.searchUserByEmail = (val) => {
   clearTimeout(dmTimer);
-  if (!val || val.length < 3) { document.getElementById('dm-search-results').innerHTML = ''; return; }
+  const el = document.getElementById('dm-search-results');
+  if (!val || val.length < 2) { el.innerHTML = ''; return; }
   dmTimer = setTimeout(async () => {
-    const q = query(collection(db, 'users'), where('email', '==', val.trim()));
-    const snap = await getDocs(q);
-    const el = document.getElementById('dm-search-results');
-    if (snap.empty) { el.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:8px 0">User tidak ditemukan</div>'; return; }
-    el.innerHTML = snap.docs.map(d => {
-      const u = d.data();
-      if (u.uid === currentUser.uid) return '';
-      // Respect privasi: kalau isPublic false, skip
-      if (u.isPublic === false) return '';
-      const emailDisplay = u.showEmail === false ? '' : `<div class="email">${escHtml(u.email)}</div>`;
+    el.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:4px 0">Mencari...</div>';
+
+    // Coba cari by userCode dulu, lalu by email
+    let users = [];
+
+    // Cari by userCode
+    const qCode = query(collection(db, 'users'), where('userCode', '==', val.trim().toUpperCase()));
+    const snapCode = await getDocs(qCode);
+    if (!snapCode.empty) {
+      users = snapCode.docs.map(d => d.data());
+    } else {
+      // Cari by email
+      const qEmail = query(collection(db, 'users'), where('email', '==', val.trim()));
+      const snapEmail = await getDocs(qEmail);
+      users = snapEmail.docs.map(d => d.data());
+    }
+
+    users = users.filter(u => u.uid !== currentUser.uid && u.isPublic !== false);
+
+    if (!users.length) {
+      el.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:8px 0">User tidak ditemukan</div>';
+      return;
+    }
+
+    el.innerHTML = users.map(u => {
+      const emailDisplay = u.showEmail === false ? '' : `<div class="email" style="font-size:11px;color:var(--text2)">${escHtml(u.email)}</div>`;
+      const avatarHtml = u.avatar
+        ? `<img src="${u.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+        : (u.name||'U')[0].toUpperCase();
       return `<div class="user-search-result" onclick="startDM('${u.uid}')">
-        <div class="chat-avatar" style="width:38px;height:38px;font-size:15px">${(u.name||'U')[0].toUpperCase()}</div>
-        <div><div class="name">${escHtml(u.name)}</div>${emailDisplay}</div>
+        <div class="chat-avatar" style="width:38px;height:38px;font-size:15px;overflow:hidden">${avatarHtml}</div>
+        <div>
+          <div class="name">${escHtml(u.name)}</div>
+          ${emailDisplay}
+          <div style="font-size:11px;color:var(--accent);font-family:'Space Mono',monospace">#${escHtml(u.userCode||'')}</div>
+        </div>
       </div>`;
-    }).join('') || '<div style="color:var(--text2);font-size:13px;padding:8px 0">User tidak ditemukan</div>';
+    }).join('');
   }, 400);
 };
 
@@ -684,9 +719,20 @@ window.openSettings = async () => {
   } else {
     stAv.textContent = (currentUser.displayName||'U')[0].toUpperCase();
   }
-  document.getElementById('st-name').textContent = userData.name || currentUser.displayName || 'User';
+  const displayName = userData.name || currentUser.displayName || 'User';
+  document.getElementById('st-name').textContent = displayName;
   document.getElementById('st-email').textContent = currentUser.email;
-  document.getElementById('st-username-input').value = userData.name || currentUser.displayName || '';
+  document.getElementById('st-username-input').value = displayName;
+
+  // Tampilkan userCode
+  const codeEl = document.getElementById('st-usercode');
+  if (codeEl) {
+    codeEl.textContent = '#' + (userData.userCode || '...');
+    codeEl.onclick = () => {
+      navigator.clipboard.writeText(userData.userCode || '');
+      showToast('Kode disalin!', 'success');
+    };
+  }
 
   // Privacy toggles
   document.getElementById('toggle-show-email').checked = userData.showEmail !== false; // default true
@@ -961,11 +1007,12 @@ window.uploadGroupAvatar = async (input, groupId) => {
     const url = await uploadDelineFile(file);
     await updateDoc(doc(db, 'groups', groupId), { avatar: url });
     showToast('Avatar grup diperbarui!', 'success');
-    await openGroupSettings(groupId);
-    // Update header chat
+    // Update header chat langsung
     if (currentChat?.id === groupId) {
       document.getElementById('ch-avatar').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      if (currentChat.data) currentChat.data.avatar = url;
     }
+    await openGroupSettings(groupId);
   } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
   input.value = '';
 };
