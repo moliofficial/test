@@ -304,15 +304,18 @@ window.cancelLP = () => { if (longPressTimer) { clearTimeout(longPressTimer); lo
 
 window.showMsgMenu = (e, msgId) => {
   e.preventDefault();
+  if (!currentChat) return;
+  const chatType = currentChat.type;
+  const chatId = currentChat.id;
   document.getElementById('msg-ctx-menu')?.remove();
   const menu = document.createElement('div');
   menu.id = 'msg-ctx-menu';
   const x = e.touches ? e.touches[0].clientX : e.clientX;
   const y = e.touches ? e.touches[0].clientY : e.clientY;
   menu.style.cssText = `position:fixed;left:${Math.min(x,window.innerWidth-160)}px;top:${Math.min(y,window.innerHeight-80)}px;
-    background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:999;
+    background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:9999;
     min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,0.5)`;
-  menu.innerHTML = `<div onclick="deleteMsg('${msgId}')"
+  menu.innerHTML = `<div onclick="deleteMsg('${msgId}','${chatType}')"
     style="padding:10px 14px;cursor:pointer;color:var(--danger);font-size:14px;border-radius:7px;display:flex;align-items:center;gap:8px"
     onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='none'">🗑️ Hapus Pesan</div>`;
   document.body.appendChild(menu);
@@ -322,14 +325,17 @@ window.showMsgMenu = (e, msgId) => {
   }, 100);
 };
 
-window.deleteMsg = async (msgId) => {
+window.deleteMsg = async (msgId, chatType) => {
   document.getElementById('msg-ctx-menu')?.remove();
   if (!confirm('Hapus pesan ini?')) return;
   try {
-    const colName = currentChat.type === 'dm' ? 'messages' : 'group_messages';
+    const colName = chatType === 'dm' ? 'messages' : 'group_messages';
     await deleteDoc(doc(db, colName, msgId));
     showToast('Pesan dihapus', 'success');
-  } catch(e) { showToast('Gagal hapus: ' + e.message, 'error'); }
+  } catch(e) {
+    showToast('Gagal hapus: ' + e.message, 'error');
+    console.error(e);
+  }
 };
 
 // ===================== GROUP SETTINGS (ROUTE) =====================
