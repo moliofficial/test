@@ -1210,8 +1210,12 @@
 
 /* Tambah padding bawah untuk sidebar saat mobile */
 @media (max-width: 768px) {
-  #bottom-nav { display: flex !important; }
+  #bottom-nav { display: flex; }
+  #chat-area.mobile-active + * #bottom-nav,
+  #chat-area.mobile-active ~ #bottom-nav { display: none !important; }
   #sidebar { padding-bottom: 60px; }
+  #chat-area.mobile-active ~ #bottom-nav,
+  body.in-chat #bottom-nav { display: none !important; }
 }
 
 /* Desktop: sembunyikan bottom nav */
