@@ -98,7 +98,15 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('app-screen').classList.add('active');
     document.getElementById('my-name').textContent = user.displayName || 'User';
     document.getElementById('my-email').textContent = user.email;
-    document.getElementById('my-avatar').textContent = (user.displayName || 'U')[0].toUpperCase();
+    // Ambil avatar dari Firestore
+    const myAvSnap = await getDoc(doc(db, 'users', user.uid));
+    const myAvatar = myAvSnap.exists() ? myAvSnap.data().avatar : '';
+    const myAvEl = document.getElementById('my-avatar');
+    if (myAvatar) {
+      myAvEl.innerHTML = `<img src="${myAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      myAvEl.textContent = (user.displayName || 'U')[0].toUpperCase();
+    }
     loadChatList();
     setTimeout(handleRoute, 800);
   } else {
@@ -162,11 +170,15 @@ function renderChatList() {
     const isDM = c._type === 'dm';
     const name = isDM ? (c._otherUser?.name||'User') : c.name;
     const initial = (name||'?')[0].toUpperCase();
+    const avatarUrl = isDM ? (c._otherUser?.avatar||'') : (c.avatar||'');
+    const avatarHtml = avatarUrl
+      ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      : initial;
     const lastMsg = c.lastMessage ? escHtml(c.lastMessage.substring(0,40)) : 'Belum ada pesan';
     const time = c.lastMessageAt ? formatTime(c.lastMessageAt.toDate()) : '';
     const isActive = currentChat?.id === c.id ? 'active' : '';
     return `<div class="chat-item ${isActive}" onclick="openChat('${c._type}','${c.id}')">
-      <div class="chat-avatar">${initial}</div>
+      <div class="chat-avatar" style="overflow:hidden">${avatarHtml}</div>
       <div class="chat-info">
         <div class="chat-name">${escHtml(name)}</div>
         <div class="chat-last">${lastMsg}</div>
@@ -1188,3 +1200,19 @@ window.openSettings = async () => {
 
 // Init active tab
 switchBottomTab('chats');
+
+// ===================== AVATAR HELPER =====================
+// Fungsi global untuk render avatar dengan foto atau inisial
+window.avatarHtml = (user, size = 40) => {
+  const name = user?.name || user?.displayName || 'U';
+  const avatar = user?.avatar || user?.photoURL || '';
+  const initial = name[0].toUpperCase();
+  if (avatar) {
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;flex-shrink:0">
+      <img src="${avatar}" style="width:100%;height:100%;object-fit:cover">
+    </div>`;
+  }
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
+    display:flex;align-items:center;justify-content:center;font-size:${Math.floor(size*0.4)}px;
+    font-weight:700;color:#fff;flex-shrink:0;font-family:'Space Mono',monospace">${initial}</div>`;
+};
