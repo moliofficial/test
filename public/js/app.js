@@ -16,11 +16,12 @@ function showChatMobile() {
 }
 
 function showSidebarMobile() {
-  if (!isMobile()) return;
   document.getElementById('sidebar').classList.remove('hidden');
   document.getElementById('chat-area').classList.remove('mobile-active');
   document.getElementById('chat-area').style.display = '';
+  clearRoute();
 }
+window.showSidebarMobile = showSidebarMobile;
 
 import { auth, db, provider } from "./firebase-config.js";
 
@@ -54,11 +55,19 @@ function clearRoute() {
 }
 
 async function handleRoute() {
-  const hash = window.location.hash; // misal #/dm/abc123
+  const hash = window.location.hash;
   if (!hash || hash === '#' || hash === '#/') return;
   const parts = hash.replace('#/', '').split('/');
   if (parts.length < 2) return;
   const [type, id] = parts;
+
+  if (type === 'join' && id) {
+    // Join via invite link
+    document.getElementById('join-code-input').value = id;
+    openModal('modal-join-group');
+    return;
+  }
+
   if ((type === 'dm' || type === 'group') && id) {
     await openChat(type, id);
   }
@@ -303,9 +312,10 @@ function renderMessages(msgs) {
 
     const showSender = !isOut && currentChat.type === 'group';
 
+    const canDelete = isOut;
     html += `
-      <div class="msg-row ${isOut ? 'out' : 'in'}">
-        <div class="msg-bubble">
+      <div class="msg-row ${isOut ? 'out' : 'in'}" id="msg-${msg.id}">
+        <div class="msg-bubble" ${canDelete ? `oncontextmenu="showMsgMenu(event,'${msg.id}','${currentChat.type}');return false;" ontouchstart="startLongPress(event,'${msg.id}','${currentChat.type}')" ontouchend="cancelLongPress()"` : ''}>
           ${showSender ? `<div class="msg-sender">${escHtml(msg.sender_name || 'User')}</div>` : ''}
           ${escHtml(msg.text)}
           <div class="msg-time">${timeStr}</div>
@@ -500,37 +510,50 @@ window.toggleGroupInfo = async () => {
 async function renderGroupInfo() {
   if (!currentChat || currentChat.type !== 'group') return;
   const body = document.getElementById('group-info-body');
-  const snap = await getDoc(doc(db, 'groups', currentChat.id));
-  if (!snap.exists()) return;
-  const g = snap.data();
-  const isAdmin = g.admin === currentUser.uid;
+  body.innerHTML = '<div class="loading-dots">Memuat info grup...</div>';
 
-  const memberPromises = g.members.map(uid => getDoc(doc(db, 'users', uid)));
-  const memberSnaps = await Promise.all(memberPromises);
-  const members = memberSnaps.map(s => s.exists() ? s.data() : null).filter(Boolean);
+  try {
+    const snap = await getDoc(doc(db, 'groups', currentChat.id));
+    if (!snap.exists()) { body.innerHTML = '<div class="loading-dots">Grup tidak ditemukan</div>'; return; }
+    const g = snap.data();
+    const isAdmin = g.admin === currentUser.uid;
 
-  const inviteUrl = `${location.origin}${location.pathname}?invite=${g.inviteCode}`;
+    const memberPromises = (g.members || []).map(uid => getDoc(doc(db, 'users', uid)));
+    const memberSnaps = await Promise.all(memberPromises);
+    const members = memberSnaps.map(s => s.exists() ? s.data() : null).filter(Boolean);
 
-  body.innerHTML = `
-    <div class="group-info-avatar">${(g.name||'G')[0].toUpperCase()}</div>
-    <div class="group-info-name">${escHtml(g.name)}</div>
-    <div class="group-info-bio">${escHtml(g.bio || 'Belum ada deskripsi')}</div>
-    ${isAdmin ? `<button class="btn-secondary" onclick="openEditGroup('${currentChat.id}')" style="margin-bottom:16px">✏️ Edit Grup</button>` : ''}
-    <div class="section-title">Link Invite</div>
-    <div class="invite-box">
-      <code>${inviteUrl}</code>
-      <button class="copy-btn" onclick="copyText('${escAttr(inviteUrl)}')">Salin</button>
-    </div>
-    <div class="section-title" style="margin-top:20px">${g.members.length} Member</div>
-    ${members.map(m => `
-      <div class="member-row">
-        <div class="chat-avatar" style="width:34px;height:34px;font-size:13px">${(m.name||'U')[0].toUpperCase()}</div>
-        <div class="name">${escHtml(m.name)} ${m.uid === currentUser.uid ? '<span style="color:var(--text2);font-size:11px">(kamu)</span>' : ''}</div>
-        ${m.uid === g.admin ? '<span class="badge-admin">Admin</span>' : ''}
-        ${isAdmin && m.uid !== currentUser.uid ? `<button class="btn-danger" onclick="kickMember('${currentChat.id}','${m.uid}')">Kick</button>` : ''}
-      </div>`).join('')}
-    ${!isAdmin ? `<button class="btn-danger" style="width:100%;margin-top:20px;padding:10px" onclick="leaveGroup('${currentChat.id}')">🚪 Keluar Grup</button>` : ''}
-  `;
+    // Pastikan inviteCode ada
+    if (!g.inviteCode) {
+      const newCode = generateCode();
+      await updateDoc(doc(db, 'groups', currentChat.id), { inviteCode: newCode });
+      g.inviteCode = newCode;
+    }
+
+    const inviteUrl = `${location.origin}${location.pathname}#/join/${g.inviteCode}`;
+
+    body.innerHTML = `
+      <div class="group-info-avatar">${(g.name||'G')[0].toUpperCase()}</div>
+      <div class="group-info-name">${escHtml(g.name)}</div>
+      <div class="group-info-bio">${escHtml(g.bio || 'Belum ada deskripsi')}</div>
+      ${isAdmin ? `<button class="btn-secondary" onclick="openEditGroup('${currentChat.id}')" style="margin-bottom:16px">✏️ Edit Grup</button>` : ''}
+      <div class="section-title">Link Invite</div>
+      <div class="invite-box">
+        <code id="invite-code-text">${escHtml(inviteUrl)}</code>
+        <button class="copy-btn" onclick="copyText(document.getElementById('invite-code-text').textContent)">Salin</button>
+      </div>
+      <div class="section-title" style="margin-top:20px">${(g.members||[]).length} Member</div>
+      ${members.map(m => `
+        <div class="member-row">
+          <div class="chat-avatar" style="width:34px;height:34px;font-size:13px">${(m.name||'U')[0].toUpperCase()}</div>
+          <div class="name">${escHtml(m.name)} ${m.uid === currentUser.uid ? '<span style="color:var(--text2);font-size:11px">(kamu)</span>' : ''}</div>
+          ${m.uid === g.admin ? '<span class="badge-admin">Admin</span>' : ''}
+          ${isAdmin && m.uid !== currentUser.uid ? `<button class="btn-danger" onclick="kickMember('${currentChat.id}','${m.uid}')">Kick</button>` : ''}
+        </div>`).join('')}
+      ${!isAdmin ? `<button class="btn-danger" style="width:100%;margin-top:20px;padding:10px" onclick="leaveGroup('${currentChat.id}')">🚪 Keluar Grup</button>` : ''}
+    `;
+  } catch(e) {
+    body.innerHTML = `<div class="loading-dots" style="color:var(--danger)">Error: ${e.message}</div>`;
+  }
 }
 
 window.kickMember = async (groupId, uid) => {
@@ -636,6 +659,75 @@ if (inviteCode) {
     window.history.replaceState({}, '', window.location.pathname);
   });
 }
+
+
+// ===================== HAPUS PESAN =====================
+let longPressTimer = null;
+
+window.startLongPress = (e, msgId, type) => {
+  longPressTimer = setTimeout(() => {
+    showMsgMenu(e, msgId, type);
+  }, 600);
+};
+
+window.cancelLongPress = () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+};
+
+window.showMsgMenu = (e, msgId, type) => {
+  e.preventDefault();
+  // Hapus menu lama
+  const old = document.getElementById('msg-context-menu');
+  if (old) old.remove();
+
+  const menu = document.createElement('div');
+  menu.id = 'msg-context-menu';
+  menu.style.cssText = `
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px;
+    z-index: 999;
+    min-width: 140px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  `;
+
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 80) + 'px';
+
+  menu.innerHTML = `
+    <div onclick="deleteMessage('${msgId}','${type}')" style="padding:10px 14px;cursor:pointer;color:var(--danger);font-size:14px;border-radius:7px;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='none'">
+      🗑️ Hapus Pesan
+    </div>
+  `;
+
+  document.body.appendChild(menu);
+
+  // Tutup menu kalau klik di luar
+  setTimeout(() => {
+    document.addEventListener('click', () => menu.remove(), { once: true });
+    document.addEventListener('touchstart', () => menu.remove(), { once: true });
+  }, 100);
+};
+
+window.deleteMessage = async (msgId, type) => {
+  const old = document.getElementById('msg-context-menu');
+  if (old) old.remove();
+
+  if (!confirm('Hapus pesan ini?')) return;
+
+  try {
+    const colName = type === 'dm' ? 'messages' : 'group_messages';
+    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    await deleteDoc(doc(db, colName, msgId));
+    showToast('Pesan dihapus', 'success');
+  } catch(e) {
+    showToast('Gagal hapus: ' + e.message, 'error');
+  }
+};
 
 // ===================== UTILS =====================
 window.openModal = (id) => document.getElementById(id).classList.add('active');
