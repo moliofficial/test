@@ -1127,24 +1127,37 @@
 </div>
 
 <!-- STATUS VIEWER -->
-<div id="status-viewer" style="display:none;position:fixed;inset:0;background:#000;z-index:300;flex-direction:column">
-  <div style="position:absolute;top:0;left:0;right:0;z-index:1;padding:16px;display:flex;align-items:center;gap:12px;background:linear-gradient(to bottom,rgba(0,0,0,0.7),transparent)">
-    <div class="icon-btn" onclick="closeStatusViewer()" style="background:rgba(255,255,255,0.1)">←</div>
-    <div id="sv-avatar" style="width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700"></div>
-    <div>
+<div id="status-viewer" style="display:none;position:fixed;inset:0;background:#000;z-index:300;flex-direction:column"
+  onclick="handleStatusTap(event)">
+  <!-- Progress segments -->
+  <div id="sv-progress-container" style="position:absolute;top:8px;left:8px;right:8px;z-index:2;display:flex;gap:2px;height:3px"></div>
+
+  <!-- Header -->
+  <div style="position:absolute;top:18px;left:0;right:0;z-index:1;padding:8px 16px;display:flex;align-items:center;gap:10px">
+    <div class="icon-btn" onclick="closeStatusViewer();event.stopPropagation()" style="background:rgba(255,255,255,0.15);color:#fff">←</div>
+    <div id="sv-avatar" style="width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff"></div>
+    <div style="flex:1">
       <div id="sv-name" style="font-size:14px;font-weight:600;color:#fff"></div>
-      <div id="sv-time" style="font-size:12px;color:rgba(255,255,255,0.7)"></div>
+      <div id="sv-time" style="font-size:11px;color:rgba(255,255,255,0.7)"></div>
     </div>
-    <div id="sv-delete" style="margin-left:auto;display:none">
-      <button class="btn-danger" onclick="deleteMyStatus()" style="padding:6px 12px">Hapus</button>
+    <div id="sv-delete" style="display:none">
+      <button class="btn-danger" style="padding:5px 12px;font-size:12px" onclick="event.stopPropagation()">Hapus</button>
     </div>
   </div>
-  <!-- Progress bar -->
-  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.3);z-index:2">
-    <div id="sv-progress" style="height:100%;background:var(--accent);width:0%;transition:width linear"></div>
+
+  <!-- Content -->
+  <div id="sv-content" style="flex:1;display:flex;align-items:center;justify-content:center;margin-top:60px"></div>
+
+  <!-- Footer -->
+  <div style="padding:12px 16px 24px;display:flex;align-items:center;gap:10px;background:linear-gradient(to top,rgba(0,0,0,0.8),transparent)">
+    <div id="sv-caption" style="flex:1;color:#fff;font-size:14px"></div>
+    <div id="sv-viewers-btn" style="display:none">
+      <button onclick="showCurrentStatusViewers();event.stopPropagation()"
+        style="background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">
+        👁️ <span id="sv-view-count">0</span>
+      </button>
+    </div>
   </div>
-  <div id="sv-content" style="flex:1;display:flex;align-items:center;justify-content:center"></div>
-  <div id="sv-caption" style="padding:16px;text-align:center;color:#fff;font-size:14px;background:linear-gradient(to top,rgba(0,0,0,0.7),transparent)"></div>
 </div>
 
 <style>
