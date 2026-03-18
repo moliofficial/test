@@ -632,14 +632,17 @@ window.searchUserByEmail = (val) => {
     // Coba cari by userCode dulu, lalu by email
     let users = [];
 
-    // Cari by userCode
-    const qCode = query(collection(db, 'users'), where('userCode', '==', val.trim().toUpperCase()));
+    // Bersihkan input - hapus # jika ada
+    const cleanVal = val.trim().replace(/^#/, '');
+
+    // Cari by userCode (exact match, case sensitive sesuai yang tersimpan)
+    const qCode = query(collection(db, 'users'), where('userCode', '==', cleanVal));
     const snapCode = await getDocs(qCode);
     if (!snapCode.empty) {
       users = snapCode.docs.map(d => d.data());
     } else {
       // Cari by email
-      const qEmail = query(collection(db, 'users'), where('email', '==', val.trim()));
+      const qEmail = query(collection(db, 'users'), where('email', '==', cleanVal));
       const snapEmail = await getDocs(qEmail);
       users = snapEmail.docs.map(d => d.data());
     }
