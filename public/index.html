@@ -827,7 +827,7 @@
           <div class="icon-btn" id="group-info-btn" style="display:none" onclick="toggleGroupInfo()" title="Info Grup">ℹ️</div>
         </div>
       </div>
-      <div id="messages-container"></div>
+      <div id="messages-container" style="padding-bottom:16px"></div>
       <div class="chat-input-area">
         <label class="icon-btn" for="media-upload-input" title="Kirim foto/video" style="cursor:pointer;flex-shrink:0">📎</label>
         <input type="file" id="media-upload-input" accept="image/*,video/*" style="display:none" onchange="handleMediaSelect(this)" />
@@ -1241,6 +1241,32 @@
   }
 }
 </style>
+
+<style>
+/* FIX: Chat area mobile - scroll berfungsi */
+@media (max-width: 768px) {
+  #chat-view {
+    height: 100vh;
+    height: 100dvh; /* dynamic viewport height - handle keyboard */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #messages-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 12px;
+    min-height: 0; /* penting! tanpa ini flex child tidak bisa scroll */
+  }
+  .chat-input-area {
+    flex-shrink: 0;
+    position: relative !important;
+    bottom: auto !important;
+  }
+}
+</style>
 </body>
 </html>
 <style>
@@ -1285,6 +1311,7 @@
   #messages-container {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
   }
   .chat-input-area {
