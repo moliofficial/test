@@ -798,6 +798,7 @@
         <div class="icon-btn" onclick="openNewDM()" title="Chat Baru">✏️</div>
         <div class="icon-btn" onclick="openCreateGroup()" title="Buat Grup">👥</div>
         <div class="icon-btn" onclick="openJoinGroup()" title="Join Grup">🔗</div>
+        <div class="icon-btn" onclick="openStatus()" title="Status">🟢</div>
         <div class="icon-btn" onclick="openSettings()" title="Pengaturan">⚙️</div>
         <div class="icon-btn" onclick="doLogout()" title="Keluar" style="color:var(--danger)">⏻</div>
       </div>
@@ -836,6 +837,8 @@
       </div>
       <div id="messages-container"></div>
       <div class="chat-input-area">
+        <label class="icon-btn" for="media-upload-input" title="Kirim foto/video" style="cursor:pointer;flex-shrink:0">📎</label>
+        <input type="file" id="media-upload-input" accept="image/*,video/*" style="display:none" onchange="handleMediaSelect(this)" />
         <textarea id="message-input" placeholder="Ketik pesan..." rows="1" onkeydown="handleEnter(event)" oninput="autoResize(this)"></textarea>
         <button id="send-btn" onclick="sendMessage()">➤</button>
       </div>
@@ -993,12 +996,22 @@
     <!-- Profile Section -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-        <div id="st-avatar" style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
-          display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;
-          font-family:'Space Mono',monospace;color:#fff;flex-shrink:0">?</div>
-        <div>
+        <div style="position:relative;flex-shrink:0">
+          <div id="st-avatar" style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
+            display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;
+            font-family:'Space Mono',monospace;color:#fff;overflow:hidden">?</div>
+          <label for="avatar-upload-file" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;
+            background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;
+            cursor:pointer;font-size:11px;color:#000;font-weight:700">+</label>
+          <input type="file" id="avatar-upload-file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" />
+        </div>
+        <div style="flex:1">
           <div id="st-name" style="font-size:18px;font-weight:700">—</div>
           <div id="st-email" style="font-size:13px;color:var(--text2)">—</div>
+          <button onclick="openAvatarEdit()" style="margin-top:6px;background:none;border:1px solid var(--border);
+            border-radius:8px;padding:4px 10px;color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">
+            🔗 Via Link
+          </button>
         </div>
       </div>
 
@@ -1065,6 +1078,87 @@
 }
 .toggle-switch input:checked + .toggle-slider { background:var(--accent); }
 .toggle-switch input:checked + .toggle-slider:before { transform:translateX(22px); }
+</style>
+
+<!-- MEDIA PREVIEW MODAL -->
+<div class="modal-overlay" id="modal-media-preview">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Kirim Media</div>
+      <div class="modal-close" onclick="closeModal('modal-media-preview')">✕</div>
+    </div>
+    <div id="media-preview-content" style="text-align:center;margin-bottom:16px"></div>
+    <div class="form-group">
+      <input type="text" id="media-caption" placeholder="Tambah keterangan (opsional)" />
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-secondary" onclick="closeModal('modal-media-preview')" style="flex:1">Batal</button>
+      <button class="btn btn-primary" onclick="sendMedia()" id="send-media-btn" style="flex:1">Kirim</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS SCREEN -->
+<div id="status-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0">
+    <div class="icon-btn" onclick="closeStatus()">←</div>
+    <h2 style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace;flex:1">Status</h2>
+    <label class="icon-btn" for="status-upload" title="Buat Status" style="cursor:pointer">＋</label>
+    <input type="file" id="status-upload" accept="image/*,video/*" style="display:none" onchange="handleStatusUpload(this)" />
+  </div>
+
+  <!-- My status -->
+  <div style="padding:16px;border-bottom:1px solid var(--border)">
+    <div class="section-title" style="margin-bottom:10px">STATUS SAYA</div>
+    <div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="document.getElementById('status-upload').click()">
+      <div id="my-status-avatar" style="width:52px;height:52px;border-radius:50%;background:var(--surface2);
+        border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;position:relative;overflow:hidden">
+        <span id="my-status-initial">?</span>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:600">Status saya</div>
+        <div id="my-status-time" style="font-size:12px;color:var(--text2)">Ketuk untuk tambah status</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Others status -->
+  <div style="flex:1;overflow-y:auto;padding:16px">
+    <div class="section-title" style="margin-bottom:10px">STATUS TERBARU</div>
+    <div id="status-list">
+      <div class="loading-dots">Memuat status...</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS VIEWER -->
+<div id="status-viewer" style="display:none;position:fixed;inset:0;background:#000;z-index:300;flex-direction:column">
+  <div style="position:absolute;top:0;left:0;right:0;z-index:1;padding:16px;display:flex;align-items:center;gap:12px;background:linear-gradient(to bottom,rgba(0,0,0,0.7),transparent)">
+    <div class="icon-btn" onclick="closeStatusViewer()" style="background:rgba(255,255,255,0.1)">←</div>
+    <div id="sv-avatar" style="width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700"></div>
+    <div>
+      <div id="sv-name" style="font-size:14px;font-weight:600;color:#fff"></div>
+      <div id="sv-time" style="font-size:12px;color:rgba(255,255,255,0.7)"></div>
+    </div>
+    <div id="sv-delete" style="margin-left:auto;display:none">
+      <button class="btn-danger" onclick="deleteMyStatus()" style="padding:6px 12px">Hapus</button>
+    </div>
+  </div>
+  <!-- Progress bar -->
+  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.3);z-index:2">
+    <div id="sv-progress" style="height:100%;background:var(--accent);width:0%;transition:width linear"></div>
+  </div>
+  <div id="sv-content" style="flex:1;display:flex;align-items:center;justify-content:center"></div>
+  <div id="sv-caption" style="padding:16px;text-align:center;color:#fff;font-size:14px;background:linear-gradient(to top,rgba(0,0,0,0.7),transparent)"></div>
+</div>
+
+<style>
+/* Media messages */
+.msg-media { max-width: 240px; border-radius: 10px; overflow: hidden; cursor: pointer; }
+.msg-media img { width: 100%; display: block; border-radius: 8px; }
+.msg-media video { width: 100%; display: block; border-radius: 8px; }
+/* Status avatar ring */
+.status-ring { border: 2px solid var(--accent) !important; }
 </style>
 </body>
 </html>
