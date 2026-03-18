@@ -1120,10 +1120,12 @@ async function loadStatuses() {
   try {
     // Ambil semua status, filter expiry di client (hindari composite index)
     const snap = await getDocs(collection(db, 'statuses'));
+    const now = Date.now();
     const allStatuses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(s => {
-        const exp = s.expiresAt?.toDate ? s.expiresAt.toDate().getTime() : (s.expiresAt?.seconds * 1000 || 0);
-        return exp > expiryMs;
+        // expiresAt = waktu expired di masa depan, harus > sekarang
+        const exp = s.expiresAt?.toDate ? s.expiresAt.toDate().getTime() : (s.expiresAt?.seconds * 1000 || Infinity);
+        return exp > now;
       });
 
     // Group by user — ambil status terbaru per user
@@ -1213,16 +1215,15 @@ let currentStatusQueue = [];
 let currentStatusIndex = 0;
 
 window.viewStatusByUser = async (uid, startId) => {
-  // Ambil semua status user ini yang masih aktif
-  const expiryMs = Date.now() - 24 * 60 * 60 * 1000;
+  const now = Date.now();
   try {
-    const snap = await getDocs(collection(db, 'statuses'));
+    const snap = await getDocs(query(collection(db, 'statuses'), where('uid', '==', uid)));
     const userStatuses = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(s => {
-        if (s.uid !== uid) return false;
-        const exp = s.expiresAt?.toDate ? s.expiresAt.toDate().getTime() : (s.expiresAt?.seconds * 1000 || 0);
-        return exp > expiryMs;
+        // expiresAt adalah waktu expired di masa depan
+        const exp = s.expiresAt?.toDate ? s.expiresAt.toDate().getTime() : (s.expiresAt?.seconds * 1000 || Infinity);
+        return exp > now;
       })
       .sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
 
@@ -1262,8 +1263,14 @@ function showStatusSlide(idx) {
   document.getElementById('sv-caption').textContent = statusData.caption || '';
 
   const isOwner = statusData.uid === currentUser.uid;
-  document.getElementById('sv-delete').style.display = isOwner ? 'block' : 'none';
-  if (isOwner) document.getElementById('sv-delete').onclick = () => deleteMyStatus(statusId);
+  const svDelEl = document.getElementById('sv-delete');
+  if (svDelEl) {
+    svDelEl.style.display = isOwner ? 'block' : 'none';
+    if (isOwner) {
+      const delBtn = svDelEl.querySelector('button');
+      if (delBtn) delBtn.onclick = (e) => { e.stopPropagation(); deleteMyStatus(statusId); };
+    }
+  }
 
   // Progress bars untuk multi-slide
   // Update progress segments dulu
@@ -1369,13 +1376,16 @@ window.closeStatusViewer = () => {
 };
 
 window.deleteMyStatus = async (statusId) => {
-  if (!statusId || !confirm('Hapus status ini?')) return;
+  // Kalau tidak ada parameter, pakai status yang sedang ditampilkan
+  const id = statusId || currentStatusQueue[currentStatusIndex]?.id;
+  if (!id) return showToast('ID status tidak valid', 'error');
+  if (!confirm('Hapus status ini?')) return;
   try {
-    await deleteDoc(doc(db, 'statuses', statusId));
-    closeStatusViewer();
+    await deleteDoc(doc(db, 'statuses', id));
     showToast('Status dihapus', 'success');
+    closeStatusViewer();
     await loadStatuses();
-  } catch(e) { showToast('Gagal: ' + e.message, 'error'); }
+  } catch(e) { showToast('Gagal hapus: ' + e.message, 'error'); }
 };
 
 // ===================== BOTTOM NAVBAR =====================
