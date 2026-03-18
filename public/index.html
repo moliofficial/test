@@ -798,6 +798,7 @@
         <div class="icon-btn" onclick="openNewDM()" title="Chat Baru">✏️</div>
         <div class="icon-btn" onclick="openCreateGroup()" title="Buat Grup">👥</div>
         <div class="icon-btn" onclick="openJoinGroup()" title="Join Grup">🔗</div>
+        <div class="icon-btn" onclick="openSettings()" title="Pengaturan">⚙️</div>
         <div class="icon-btn" onclick="doLogout()" title="Keluar" style="color:var(--danger)">⏻</div>
       </div>
     </div>
@@ -979,6 +980,92 @@
     <button class="btn btn-primary" onclick="saveGSEdit()" style="margin-top:4px">Simpan</button>
   </div>
 </div>
+
+<!-- SETTINGS SCREEN -->
+<div id="settings-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;overflow-y:auto;">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1;">
+    <div class="icon-btn" onclick="closeSettings()">←</div>
+    <h2 style="font-size:16px;font-weight:700;font-family:'Space Mono',monospace;flex:1">Pengaturan</h2>
+  </div>
+
+  <div style="padding:20px;max-width:520px;margin:0 auto;width:100%">
+
+    <!-- Profile Section -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div id="st-avatar" style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
+          display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;
+          font-family:'Space Mono',monospace;color:#fff;flex-shrink:0">?</div>
+        <div>
+          <div id="st-name" style="font-size:18px;font-weight:700">—</div>
+          <div id="st-email" style="font-size:13px;color:var(--text2)">—</div>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-bottom:12px">PROFIL</div>
+
+      <div class="form-group">
+        <label>Username / Nama Tampil</label>
+        <input type="text" id="st-username-input" placeholder="Nama kamu" maxlength="30"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;
+          padding:12px 14px;color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;outline:none" />
+      </div>
+      <p style="font-size:12px;color:var(--text2);margin-top:-8px;margin-bottom:16px">Email tidak bisa diubah</p>
+
+      <button class="btn btn-primary" onclick="saveUsername()" id="save-username-btn">Simpan Perubahan</button>
+    </div>
+
+    <!-- Privacy Section -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px">
+      <div class="section-title" style="margin-bottom:16px">PRIVASI</div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:14px;font-weight:500">Tampilkan Email</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">Email kamu terlihat oleh user lain</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-show-email" onchange="savePrivacy()" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0">
+        <div>
+          <div style="font-size:14px;font-weight:500">Profil Publik</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">User lain bisa cari kamu via email</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggle-public" onchange="savePrivacy()" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div style="background:var(--surface);border:1px solid rgba(255,68,102,0.3);border-radius:16px;padding:20px">
+      <div class="section-title" style="margin-bottom:16px;color:var(--danger)">AKUN</div>
+      <button class="btn-danger" style="width:100%;padding:12px;font-size:14px" onclick="doLogout()">
+        ⏻ Keluar dari KmoliChat
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+.toggle-switch { position:relative;display:inline-block;width:48px;height:26px; }
+.toggle-switch input { opacity:0;width:0;height:0; }
+.toggle-slider {
+  position:absolute;inset:0;background:var(--border);border-radius:26px;cursor:pointer;transition:.3s;
+}
+.toggle-slider:before {
+  content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;
+  background:#fff;border-radius:50%;transition:.3s;
+}
+.toggle-switch input:checked + .toggle-slider { background:var(--accent); }
+.toggle-switch input:checked + .toggle-slider:before { transform:translateX(22px); }
+</style>
 </body>
 </html>
 <style>
