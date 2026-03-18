@@ -1,9 +1,9 @@
-// api/send-otp.js
+const crypto = require('crypto');
 
 const FONNTE_TOKEN = "AL8bgF5kz57xq4Fge3jX";
 const OTP_SECRET = "kmolichaat_whatsapp_2024";
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -42,8 +42,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Gagal kirim OTP: ' + (data.reason || 'Cek token Fonnte') });
     }
 
-    const crypto = await import('crypto');
-    const otpToken = crypto.default
+    const otpToken = crypto
       .createHmac('sha256', OTP_SECRET)
       .update(`${otp}:${normalized}:${expiry}`)
       .digest('hex');
@@ -53,4 +52,4 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
-}
+};

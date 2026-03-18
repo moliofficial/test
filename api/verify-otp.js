@@ -1,11 +1,10 @@
-// api/verify-otp.js
-// Verifikasi OTP - tanpa Firebase Admin, pakai Firestore REST API
+const crypto = require('crypto');
 
 const OTP_SECRET = "kmolichaat_whatsapp_2024";
 const FIREBASE_API_KEY = "AIzaSyDlNKPFyaDiwuWcoYoc9QghiTuvxuWwnUc";
 const FIREBASE_PROJECT_ID = "whatsapp-kmoli";
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -17,14 +16,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Data tidak lengkap' });
   }
 
-  // Cek expired
   if (Date.now() > expiry) {
     return res.status(400).json({ error: 'OTP sudah expired, minta ulang' });
   }
 
-  // Verifikasi token
-  const crypto = await import('crypto');
-  const expected = crypto.default
+  const expected = crypto
     .createHmac('sha256', OTP_SECRET)
     .update(`${otp}:${phone}:${expiry}`)
     .digest('hex');
@@ -33,10 +29,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'OTP salah' });
   }
 
-  // OTP valid — login pakai Firebase Anonymous Auth lalu link ke phone
-  // Cara: sign in anonymous → dapat idToken → simpan phone di Firestore
   try {
-    // Sign in anonymous untuk dapat Firebase session token
+    // Sign in anonymous Firebase untuk dapat uid
     const signInRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
       {
@@ -55,14 +49,14 @@ export default async function handler(req, res) {
     const idToken = signInData.idToken;
     const refreshToken = signInData.refreshToken;
 
-    // Simpan data user ke Firestore via REST
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
-    
-    // Cek apakah user dengan phone ini sudah ada
+    // Cek apakah sudah ada user dengan nomor ini di Firestore
     const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
-    const queryRes = await fetch(queryUrl + `?key=${FIREBASE_API_KEY}`, {
+    const queryRes = await fetch(queryUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
       body: JSON.stringify({
         structuredQuery: {
           from: [{ collectionId: 'users' }],
@@ -79,20 +73,23 @@ export default async function handler(req, res) {
     });
 
     const queryData = await queryRes.json();
-    const existingUser = queryData[0]?.document;
+    const existingDoc = queryData[0]?.document;
 
     let finalUid = uid;
     let isNewUser = true;
 
-    if (existingUser) {
-      // User lama — return uid lama
-      finalUid = existingUser.name.split('/').pop();
+    if (existingDoc) {
+      finalUid = existingDoc.name.split('/').pop();
       isNewUser = false;
     } else {
-      // User baru — simpan ke Firestore
-      await fetch(`${firestoreUrl}?key=${FIREBASE_API_KEY}`, {
+      // Simpan user baru
+      const userUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+      await fetch(userUrl, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify({
           fields: {
             uid: { stringValue: uid },
@@ -115,7 +112,6 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
-}
+};
