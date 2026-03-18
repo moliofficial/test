@@ -232,42 +232,6 @@ function listenMessages(type, id) {
   });
 }
 
-function renderMessages(msgs) {
-  const container = document.getElementById('messages-container');
-  const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
-  if (!msgs.length) { container.innerHTML = '<div class="loading-dots">Belum ada pesan. Mulai ngobrol! 👋</div>'; return; }
-  let html = '', lastDate = '';
-  msgs.forEach(msg => {
-    const isOut = msg.sender_id === currentUser.uid;
-    const ts = msg.timestamp?.toDate();
-    const dateStr = ts ? ts.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long' }) : '';
-    const timeStr = ts ? ts.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) : '';
-    if (dateStr && dateStr !== lastDate) {
-      html += `<div class="msg-date-divider"><span>${dateStr}</span></div>`;
-      lastDate = dateStr;
-    }
-    const showSender = !isOut && currentChat.type === 'group';
-    // Cek apakah bisa hapus:
-    // - DM: hanya pesan sendiri
-    // - Grup: pesan sendiri + admin bisa hapus semua
-    const isGroupAdmin = currentChat.type === 'group' &&
-      (currentChat.data?.admin === currentUser.uid || (currentChat.data?.admins||[]).includes(currentUser.uid));
-    const canDelete = isOut || isGroupAdmin;
-
-    html += `<div class="msg-row ${isOut?'out':'in'}" id="msg-${msg.id}">
-      <div class="msg-bubble"
-        ${canDelete ? `oncontextmenu="showMsgMenu(event,'${msg.id}');return false;"
-        ontouchstart="startLP(event,'${msg.id}')" ontouchend="cancelLP()" ontouchmove="cancelLP()"` : ''}>
-        ${showSender ? `<div class="msg-sender">${escHtml(msg.sender_name||'User')}</div>` : ''}
-        ${escHtml(msg.text)}
-        <div class="msg-time">${timeStr}</div>
-      </div>
-    </div>`;
-  });
-  container.innerHTML = html;
-  if (wasAtBottom || msgs.length < 5) container.scrollTop = container.scrollHeight;
-}
-
 // ===================== SEND MESSAGE =====================
 window.sendMessage = async () => {
   const input = document.getElementById('message-input');
