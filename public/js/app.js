@@ -35,6 +35,7 @@ window.showSidebarMobile = function() {
   const ca = document.getElementById('chat-area');
   ca.classList.remove('mobile-active');
   ca.style.display = '';
+  showBottomNav();
   clearRoute();
 };
 
@@ -276,6 +277,7 @@ window.openChat = async (type, id) => {
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('chat-view').classList.add('active');
   showChatMobile();
+  hideBottomNav();
   listenMessages(type, id);
 };
 
@@ -378,6 +380,7 @@ window.openGroupSettings = async (groupId) => {
   const screen = document.getElementById('group-settings-screen');
   const body = document.getElementById('group-settings-body');
   screen.style.display = 'flex';
+  hideBottomNav();
   body.innerHTML = '<div class="loading-dots">Memuat...</div>';
 
   try {
@@ -476,7 +479,9 @@ window.closeGroupSettings = () => {
   document.getElementById('group-settings-screen').style.display = 'none';
   if (currentChat) {
     setRoute(`/group/${currentChat.id}`);
+    hideBottomNav(); // masih di dalam chat
   } else {
+    showBottomNav();
     clearRoute();
   }
 };
@@ -755,6 +760,7 @@ function generateCode(len=10) {
 window.openSettings = async () => {
   const screen = document.getElementById('settings-screen');
   screen.style.display = 'flex';
+  hideBottomNav();
   setRoute('/settings');
 
   // Isi data profil
@@ -792,6 +798,7 @@ window.openSettings = async () => {
 
 window.closeSettings = () => {
   document.getElementById('settings-screen').style.display = 'none';
+  showBottomNav();
   clearRoute();
 };
 
@@ -1072,6 +1079,7 @@ window.uploadGroupAvatar = async (input, groupId) => {
 window.openStatus = async () => {
   const screen = document.getElementById('status-screen');
   screen.style.display = 'flex';
+  hideBottomNav();
   setRoute('/status');
   document.getElementById('my-status-initial').textContent = (currentUser.displayName||'U')[0].toUpperCase();
   await loadStatuses();
@@ -1079,6 +1087,7 @@ window.openStatus = async () => {
 
 window.closeStatus = () => {
   document.getElementById('status-screen').style.display = 'none';
+  showBottomNav();
   clearRoute();
 };
 
@@ -1094,20 +1103,30 @@ async function loadStatuses() {
         return exp > expiryMs;
       });
 
-    const statuses = allStatuses
+    // Group by user — ambil status terbaru per user
+    const byUser = {};
+    allStatuses.forEach(s => {
+      if (!byUser[s.uid] || (s.createdAt?.seconds||0) > (byUser[s.uid].createdAt?.seconds||0)) {
+        byUser[s.uid] = s;
+      }
+    });
+
+    // Semua status kecuali milik sendiri untuk list terbaru
+    const statuses = Object.values(byUser)
       .filter(s => s.uid !== currentUser.uid)
       .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 
-    // Cek status sendiri
+    // Status milik sendiri
     const myStatuses = allStatuses.filter(s => s.uid === currentUser.uid);
     const mySnap = { docs: myStatuses.map(s => ({ id: s.id, data: () => s })) };
     if (false) { // dummy block untuk kompatibilitas kode di bawah
     }
     const myStatus = mySnap.docs[0];
     if (myStatus) {
-      document.getElementById('my-status-time').textContent = formatTime(myStatus.data().createdAt?.toDate ? myStatus.data().createdAt.toDate() : new Date());
+      const msData = myStatus.data();
+      document.getElementById('my-status-time').textContent = formatTime(msData.createdAt?.toDate ? msData.createdAt.toDate() : new Date());
       document.getElementById('my-status-avatar').classList.add('status-ring');
-      document.getElementById('my-status-avatar').onclick = () => viewStatus(myStatus.id, myStatus.data());
+      document.getElementById('my-status-avatar').onclick = () => viewStatus(myStatus.id, msData);
     }
 
     if (!statuses.length) { container.innerHTML = '<div class="loading-dots">Tidak ada status terbaru</div>'; return; }
@@ -1120,8 +1139,9 @@ async function loadStatuses() {
 
     container.innerHTML = statuses.map(s => {
       const u = users[s.uid] || {};
+      const safeData = encodeURIComponent(JSON.stringify(s));
       return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer;border-bottom:1px solid var(--border)"
-        onclick="viewStatus('${s.id}',${JSON.stringify(JSON.stringify(s)).slice(1,-1)})">
+        onclick="viewStatusEncoded('${safeData}')">
         <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
           display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;
           border:2px solid var(--accent);flex-shrink:0;overflow:hidden">
@@ -1129,7 +1149,7 @@ async function loadStatuses() {
         </div>
         <div>
           <div style="font-size:14px;font-weight:600">${escHtml(u.name||'User')}</div>
-          <div style="font-size:12px;color:var(--text2)">${formatTime(s.createdAt?.toDate())}</div>
+          <div style="font-size:12px;color:var(--text2)">${formatTime(s.createdAt?.toDate ? s.createdAt.toDate() : new Date())}</div>
         </div>
       </div>`;
     }).join('');
@@ -1166,22 +1186,46 @@ window.handleStatusUpload = async (input) => {
 
 let statusTimer = null;
 window.viewStatus = (statusId, statusData) => {
-  if (typeof statusData === 'string') { try { statusData = JSON.parse(statusData); } catch(e) {} }
+  if (!statusData) return showToast('Data status tidak ditemukan', 'error');
+  if (typeof statusData === 'string') {
+    try { statusData = JSON.parse(statusData); } catch(e) { return showToast('Gagal buka status', 'error'); }
+  }
+
   const viewer = document.getElementById('status-viewer');
   viewer.style.display = 'flex';
+  hideBottomNav();
 
-  document.getElementById('sv-name').textContent = statusData.name || 'User';
-  document.getElementById('sv-time').textContent = statusData.createdAt?.toDate ? formatTime(statusData.createdAt.toDate()) : 'baru saja';
-  document.getElementById('sv-avatar').textContent = (statusData.name||'U')[0].toUpperCase();
+  // Handle nama
+  const name = statusData.name || statusData.userName || 'User';
+  document.getElementById('sv-name').textContent = name;
+  document.getElementById('sv-avatar').textContent = name[0].toUpperCase();
+
+  // Handle timestamp
+  let timeStr = 'baru saja';
+  if (statusData.createdAt) {
+    const ts = statusData.createdAt.toDate ? statusData.createdAt.toDate() : new Date(statusData.createdAt.seconds * 1000);
+    timeStr = formatTime(ts);
+  }
+  document.getElementById('sv-time').textContent = timeStr;
   document.getElementById('sv-caption').textContent = statusData.caption || '';
-  document.getElementById('sv-delete').style.display = statusData.uid === currentUser.uid ? 'block' : 'none';
-  document.getElementById('sv-delete').onclick = () => deleteMyStatus(statusId);
 
-  const content = document.getElementById('sv-content');
+  const isOwner = statusData.uid === currentUser.uid;
+  document.getElementById('sv-delete').style.display = isOwner ? 'block' : 'none';
+  if (isOwner) document.getElementById('sv-delete').onclick = () => deleteMyStatus(statusId);
+
+  // Tampilkan media
+  const svContent = document.getElementById('sv-content');
+  if (!statusData.mediaUrl) {
+    svContent.innerHTML = '<div style="color:var(--text2);padding:20px">Media tidak tersedia</div>';
+    return;
+  }
+
   if (statusData.mediaType === 'image') {
-    content.innerHTML = `<img src="${statusData.mediaUrl}" style="max-width:100%;max-height:80vh;object-fit:contain" />`;
+    svContent.innerHTML = `<img src="${statusData.mediaUrl}" style="max-width:100%;max-height:80vh;object-fit:contain" onerror="this.parentElement.innerHTML='<div style=color:var(--danger);padding:20px>Gagal load gambar</div>'" />`;
   } else if (statusData.mediaType === 'video') {
-    content.innerHTML = `<video src="${statusData.mediaUrl}" autoplay controls style="max-width:100%;max-height:80vh"></video>`;
+    svContent.innerHTML = `<video src="${statusData.mediaUrl}" autoplay controls style="max-width:100%;max-height:80vh" playsinline></video>`;
+  } else {
+    svContent.innerHTML = `<a href="${statusData.mediaUrl}" target="_blank" style="color:var(--accent);font-size:16px">📎 Buka File</a>`;
   }
 
   // Progress bar 5 detik untuk gambar
@@ -1198,6 +1242,7 @@ window.closeStatusViewer = () => {
   document.getElementById('status-viewer').style.display = 'none';
   if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
   document.getElementById('sv-progress').style.width = '0%';
+  // Jangan tampilkan bottom nav — masih di halaman status
 };
 
 window.deleteMyStatus = async (statusId) => {
@@ -1211,6 +1256,17 @@ window.deleteMyStatus = async (statusId) => {
 };
 
 // ===================== BOTTOM NAVBAR =====================
+// ===================== BOTTOM NAV VISIBILITY =====================
+function showBottomNav() {
+  const nav = document.getElementById('bottom-nav');
+  if (nav) nav.style.display = 'flex';
+}
+
+function hideBottomNav() {
+  const nav = document.getElementById('bottom-nav');
+  if (nav) nav.style.display = 'none';
+}
+
 window.switchBottomTab = (tab) => {
   // Highlight active tab
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -1254,4 +1310,14 @@ window.avatarHtml = (user, size = 40) => {
   return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
     display:flex;align-items:center;justify-content:center;font-size:${Math.floor(size*0.4)}px;
     font-weight:700;color:#fff;flex-shrink:0;font-family:'Space Mono',monospace">${initial}</div>`;
+};
+
+// Helper viewStatus pakai encoded data (menghindari masalah JSON escape di HTML)
+window.viewStatusEncoded = (encoded) => {
+  try {
+    const data = JSON.parse(decodeURIComponent(encoded));
+    viewStatus(data.id, data);
+  } catch(e) {
+    showToast('Gagal buka status', 'error');
+  }
 };
