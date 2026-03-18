@@ -1,3 +1,27 @@
+
+// ===================== MOBILE HELPERS =====================
+function isMobile() { return window.innerWidth <= 768; }
+
+function showChatMobile() {
+  if (!isMobile()) return;
+  document.getElementById('sidebar').classList.add('hidden');
+  const chatArea = document.getElementById('chat-area');
+  chatArea.classList.add('mobile-active');
+  chatArea.style.display = 'flex';
+  // Scroll ke bawah setelah animasi
+  setTimeout(() => {
+    const mc = document.getElementById('messages-container');
+    if (mc) mc.scrollTop = mc.scrollHeight;
+  }, 100);
+}
+
+function showSidebarMobile() {
+  if (!isMobile()) return;
+  document.getElementById('sidebar').classList.remove('hidden');
+  document.getElementById('chat-area').classList.remove('mobile-active');
+  document.getElementById('chat-area').style.display = '';
+}
+
 import { auth, db, provider } from "./firebase-config.js";
 
 import {
@@ -201,6 +225,7 @@ window.openChat = async (type, id) => {
   document.getElementById('group-info-panel').classList.remove('active');
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('chat-view').classList.add('active');
+  showChatMobile();
 
   listenMessages(type, id);
 };
@@ -214,10 +239,16 @@ function listenMessages(type, id) {
   const colName = type === 'dm' ? 'messages' : 'group_messages';
   const fieldName = type === 'dm' ? 'chat_id' : 'group_id';
 
-  const q = query(collection(db, colName), where(fieldName, '==', id), orderBy('timestamp', 'asc'));
+  const q = query(collection(db, colName), where(fieldName, '==', id));
 
   unsubMessages = onSnapshot(q, (snap) => {
-    const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const msgs = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const ta = a.timestamp?.seconds || 0;
+        const tb = b.timestamp?.seconds || 0;
+        return ta - tb;
+      });
     renderMessages(msgs);
   });
 }
